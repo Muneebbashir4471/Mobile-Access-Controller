@@ -1,0 +1,17 @@
+# Plain-HTTP variant for testing on a local network (no domain, no certificates).
+{
+	auto_https off
+}
+
+:8090 {
+	encode gzip
+	@backend path /api/* /ws/*
+	handle @backend {
+		reverse_proxy api:8000
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

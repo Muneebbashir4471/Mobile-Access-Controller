@@ -1,0 +1,10 @@
+.env
+deploy/.env
+server/.venv/
+__pycache__/
+.pytest_cache/
+dashboard/node_modules/
+dashboard/dist/
+deploy/.env.lan
+releases/
+dashboard/*.tsbuildinfo

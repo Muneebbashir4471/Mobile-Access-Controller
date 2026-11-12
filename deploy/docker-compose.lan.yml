@@ -1,0 +1,82 @@
+# Local-network test stack: everything on this PC, phones on the same Wi-Fi.
+#   cd deploy && docker compose -f docker-compose.lan.yml --env-file .env.lan up -d --build
+# Dashboard: http://<LAN_IP>:8090   (phones pair against the same address)
+name: mt5-lan
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    ports: ["${WEB_PORT:-8090}:8090"]
+    volumes:
+      - ./Caddyfile.lan:/etc/caddy/Caddyfile:ro
+    depends_on: [api]
+
+  api:
+    build: ../server
+    restart: unless-stopped
+    environment:
+      MT5_DATABASE_URL: postgresql+asyncpg://mt5:${POSTGRES_PASSWORD}@db:5432/mt5
+      MT5_REDIS_URL: redis://cache:6379/0
+      MT5_PUBLIC_URL: http://${LAN_IP}:${WEB_PORT:-8090}
+      MT5_EXTRA_ALLOWED_ORIGINS: '["http://localhost:${WEB_PORT:-8090}","http://127.0.0.1:${WEB_PORT:-8090}"]'
+      MT5_COOKIE_SECURE: "false"
+      MT5_TURN_SECRET: ${TURN_SECRET}
+      MT5_TURN_URLS: '["turn:${LAN_IP}:3478?transport=udp","turn:${LAN_IP}:3478?transport=tcp"]'
+      MT5_TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      MT5_TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - apk:/data/apk
+    depends_on:
+      db: {condition: service_healthy}
+      cache: {condition: service_healthy}
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mt5
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: mt5
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mt5"]
+      interval: 5s
+
+  cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+
+  turn:
+    image: coturn/coturn:4.6.3
+    restart: unless-stopped
+    # Published ports (not host networking) so Docker opens them past the host firewall (ufw).
+    # Relay ports map 1:1, so the advertised LAN_IP:port is reachable as-is.
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49160-49200:49160-49200/udp"
+    command:
+      - -n
+      - --listening-port=3478
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET}
+      - --realm=mt5.lan
+      - --external-ip=${LAN_IP}
+      - --min-port=49160
+      - --max-port=49200
+      - --fingerprint
+      - --no-cli
+      - --no-tls
+      - --no-dtls
+      - --log-file=stdout
+
+volumes:
+  apk:
+  pgdata:

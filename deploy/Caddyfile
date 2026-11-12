@@ -1,0 +1,27 @@
+{
+	email {$ACME_EMAIL}
+}
+
+phones.{$DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+	}
+	@backend path /api/* /ws/*
+	handle @backend {
+		reverse_proxy api:8000
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Exists so Caddy obtains a certificate that coturn reuses for TLS on 5349.
+turn.{$DOMAIN} {
+	respond "turn" 200
+}

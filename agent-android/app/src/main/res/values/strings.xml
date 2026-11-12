@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">MT5 Agent</string>
+    <string name="channel_name">Agent connection</string>
+    <string name="input_service_description">Lets the operator dashboard tap, swipe and type on this dedicated phone, and accept the screen capture prompt after a restart.</string>
+</resources>
