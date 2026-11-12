@@ -94,7 +94,7 @@ class AgentService : Service() {
     private var heartbeatJob: Job? = null
     private var fallbackJob: Job? = null
     private var heartbeatSeconds = 60
-    private var video = JSONObject().put("width", 720).put("fps", 30).put("bitrate", 1_500_000)
+    private var video = JSONObject().put("width", 720).put("fps", 30).put("bitrate", 3_000_000)
     private val sessions = mutableMapOf<String, RtcSession>()
     private var lastConsentPrompt = 0L
     private var lastInputWarning = 0L

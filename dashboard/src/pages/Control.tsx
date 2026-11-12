@@ -32,6 +32,17 @@ interface Stats {
   size?: string;
 }
 
+interface PhoneStats {
+  encoder: string;
+  fps: number;
+  width: number;
+  height: number;
+  target_kbps: number;
+  limited_by: string;
+  encode_ms: number | null;
+  queue_ms: number | null;
+}
+
 const LONG_PRESS_MS = 600;
 const DRAG_THRESHOLD = 0.02; // fraction of the screen
 const ACTIVITY_EVERY_MS = 10_000;
@@ -64,6 +75,7 @@ export default function Control() {
   const [text, setText] = useState("");
   const [secret, setSecret] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [phoneStats, setPhoneStats] = useState<PhoneStats | null>(null);
   const [aspect, setAspect] = useState<number | null>(null); // phone width / height
   const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
 
@@ -125,7 +137,13 @@ export default function Control() {
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    live.send({ type: "rtc_offer", session_id: sessionId, sdp: offer.sdp });
+    // Ask the phone's encoder to start near 1.5 Mbps instead of ramping up from ~300 kbps,
+    // so the first seconds are not blurry and bursty.
+    const sdp = (offer.sdp ?? "").replace(
+      /^(a=fmtp:\d+ .*)$/gm,
+      (line) => (line.includes("x-google-start-bitrate") ? line : `${line};x-google-start-bitrate=1500`),
+    );
+    live.send({ type: "rtc_offer", session_id: sessionId, sdp });
   }, [teardown]);
 
   useEffect(() => {
@@ -167,6 +185,9 @@ export default function Control() {
           break;
         case "notice":
           if (m.session_id === sid) setNotice(m.message);
+          break;
+        case "rtc_stats":
+          if (m.session_id === sid) setPhoneStats(m.stats);
           break;
         case "lock_refreshed":
           if (m.session_id === sid && m.expires_in) setLockExpiry(Date.now() + m.expires_in * 1000);
@@ -462,7 +483,17 @@ export default function Control() {
               <dt>Codec</dt><dd>{stats.codec ? `${stats.codec} ${stats.size ?? ""}` : "—"}</dd>
               <dt>Buffer</dt><dd className={stats.jitterMs != null && stats.jitterMs > 80 ? "warn" : ""}>{stats.jitterMs != null ? `${stats.jitterMs} ms` : "—"}</dd>
               <dt>Decode</dt><dd>{stats.decodeMs != null ? `${stats.decodeMs} ms` : "—"}</dd>
-              <dt>Est. delay</dt><dd>{stats.rtt != null && stats.jitterMs != null ? `~${Math.round(stats.rtt / 2 + stats.jitterMs + (stats.decodeMs ?? 0) + 1000 / Math.max(stats.fps ?? 30, 1))} ms` : "—"}</dd>
+              {phoneStats && (
+                <>
+                  <dt className="stats-head">Phone</dt><dd />
+                  <dt>Encoder</dt><dd className="mono small">{phoneStats.encoder}</dd>
+                  <dt>Encode</dt><dd className={(phoneStats.encode_ms ?? 0) > 30 ? "warn" : ""}>{phoneStats.encode_ms != null ? `${phoneStats.encode_ms} ms` : "—"}</dd>
+                  <dt>Send queue</dt><dd className={(phoneStats.queue_ms ?? 0) > 50 ? "warn" : ""}>{phoneStats.queue_ms != null ? `${phoneStats.queue_ms} ms` : "—"}</dd>
+                  <dt>Sending</dt><dd>{Math.round(phoneStats.fps)} fps · {phoneStats.width}×{phoneStats.height} · {phoneStats.target_kbps} kbps</dd>
+                  <dt>Limited by</dt><dd className={phoneStats.limited_by !== "none" ? "warn" : ""}>{phoneStats.limited_by}</dd>
+                </>
+              )}
+              <dt>Est. delay</dt><dd>{stats.rtt != null && stats.jitterMs != null ? `~${Math.round(stats.rtt / 2 + stats.jitterMs + (stats.decodeMs ?? 0) + (phoneStats?.encode_ms ?? 0) + (phoneStats?.queue_ms ?? 0) + 1000 / Math.max(stats.fps ?? 30, 1))} ms` : "—"}</dd>
             </dl>
             {secondsLeft != null && secondsLeft <= 60 && (
               <p className="warn">Releasing in {secondsLeft}s unless you use the phone.</p>

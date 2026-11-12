@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     offline_alert_seconds: int = 180
     low_battery_percent: int = 20
     # 30 fps keeps input-to-screen delay low; the cap only matters while the screen changes a lot.
-    default_video: dict = {"width": 720, "fps": 30, "bitrate": 1_500_000}
+    default_video: dict = {"width": 720, "fps": 30, "bitrate": 3_000_000}
 
     # Agent APK releases (a Docker volume in production)
     apk_dir: str = "/data/apk"

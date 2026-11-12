@@ -28,7 +28,10 @@ STATUS_FIELDS = (
     "screen_on", "locked",
 )
 # "notice": short messages from the phone for the operator (e.g. the result of an unlock).
-FORWARD_TO_OPERATOR = {"rtc_answer": ("sdp",), "ice": ("candidate",), "notice": ("message",)}
+FORWARD_TO_OPERATOR = {
+    "rtc_answer": ("sdp",), "ice": ("candidate",), "notice": ("message",),
+    "rtc_stats": ("stats",),  # the phone's encoder / send-queue stats for the control view
+}
 
 
 class AgentConn:

@@ -122,7 +122,7 @@ def test_open_lock_signaling_and_takeover(client):
             assert opened["turn"]["username"].endswith(sid)
 
             start = _recv_until(agent, "session_start")
-            assert start["session_id"] == sid and start["video"]["fps"] == 30
+            assert start["session_id"] == sid and start["video"]["fps"] == 30 and start["video"]["bitrate"] == 3_000_000
 
             # Signaling relays both ways.
             ows.send_json({"type": "rtc_offer", "session_id": sid, "sdp": "v=0 offer"})

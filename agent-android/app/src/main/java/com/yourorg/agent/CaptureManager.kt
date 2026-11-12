@@ -66,7 +66,9 @@ class CaptureManager(
 
     private fun ensureTrack(): VideoSource {
         source?.let { return it }
-        val src = factory.createVideoSource(/* isScreencast = */ true)
+        // Not "screencast": that mode tunes WebRTC for crisp slides over latency. Remote control
+        // wants the real-time (camera-like) pipeline.
+        val src = factory.createVideoSource(/* isScreencast = */ false)
         source = src
         track = factory.createVideoTrack("screen", src)
         return src

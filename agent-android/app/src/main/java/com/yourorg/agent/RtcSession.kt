@@ -12,6 +12,8 @@ import org.webrtc.RtpReceiver
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * One operator session: a relayed peer connection that sends the screen track and receives
@@ -36,6 +38,8 @@ class RtcSession(
     private var remoteSet = false
     private val pendingIce = mutableListOf<IceCandidate>()
     private var closed = false
+    private val statsTimer = Executors.newSingleThreadScheduledExecutor()
+    private var lastStats: Map<String, Double> = emptyMap()
 
     init {
         val urls = turn.getJSONArray("urls").let { a -> (0 until a.length()).map { a.getString(it) } }
@@ -54,6 +58,40 @@ class RtcSession(
         }
         pc = capture.factory.createPeerConnection(config, Observer())
             ?: throw IllegalStateException("could not create peer connection")
+        statsTimer.scheduleWithFixedDelay({ runCatching { reportStats() } }, 2, 2, TimeUnit.SECONDS)
+    }
+
+    /**
+     * Sends the sender's view to the control view: which encoder runs, how long encoding takes,
+     * how long packets wait in the send queue (pacer), and what limits quality. These show where
+     * screen delay comes from on the phone side.
+     */
+    private fun reportStats() {
+        pc.getStats { report ->
+            val out = report.statsMap.values.firstOrNull { it.type == "outbound-rtp" && it.members["kind"] == "video" }
+                ?: return@getStats
+            val m = out.members
+            fun num(k: String) = (m[k] as? Number)?.toDouble() ?: 0.0
+            val now = mapOf(
+                "encodeTime" to num("totalEncodeTime"), "framesEncoded" to num("framesEncoded"),
+                "sendDelay" to num("totalPacketSendDelay"), "packetsSent" to num("packetsSent"),
+            )
+            val prev = lastStats
+            lastStats = now
+            fun delta(k: String) = (now[k] ?: 0.0) - (prev[k] ?: 0.0)
+            val frames = delta("framesEncoded")
+            val packets = delta("packetsSent")
+            val stats = JSONObject()
+                .put("encoder", m["encoderImplementation"]?.toString() ?: "?")
+                .put("fps", num("framesPerSecond"))
+                .put("width", num("frameWidth").toInt())
+                .put("height", num("frameHeight").toInt())
+                .put("target_kbps", (num("targetBitrate") / 1000).toInt())
+                .put("limited_by", m["qualityLimitationReason"]?.toString() ?: "none")
+                .put("encode_ms", if (frames > 0) (delta("encodeTime") / frames * 1000).toInt() else JSONObject.NULL)
+                .put("queue_ms", if (packets > 0) (delta("sendDelay") / packets * 1000).toInt() else JSONObject.NULL)
+            send(JSONObject().put("type", "rtc_stats").put("session_id", sessionId).put("stats", stats))
+        }
     }
 
     fun onOffer(sdp: String) {
@@ -79,10 +117,10 @@ class RtcSession(
 
     private fun applyVideoLimits(params: RtpParameters): RtpParameters? {
         if (params.encodings.isEmpty()) return null
-        val maxBitrate = video.optInt("bitrate", 1_500_000)
+        val maxBitrate = video.optInt("bitrate", 3_000_000)
         params.encodings[0].maxBitrateBps = maxBitrate
         // A floor stops the encoder from starving itself (and stalling) while bandwidth is probed.
-        params.encodings[0].minBitrateBps = minOf(300_000, maxBitrate)
+        params.encodings[0].minBitrateBps = minOf(500_000, maxBitrate)
         params.encodings[0].maxFramerate = video.optInt("fps", 30)
         // Under pressure, trade a little of both rather than freezing on sharp-but-stale frames.
         params.degradationPreference = RtpParameters.DegradationPreference.BALANCED
@@ -128,6 +166,7 @@ class RtcSession(
             if (closed) return false
             closed = true
         }
+        statsTimer.shutdownNow()
         runCatching { pc.dispose() } // also disposes the senders; the shared track stays alive
         return true
     }

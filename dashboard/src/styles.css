@@ -195,3 +195,4 @@ a.button.ghost-link { background: transparent; color: var(--text); border: 1px s
   background: rgba(255, 255, 255, 0.35); pointer-events: none; animation: ripple 0.45s ease-out forwards;
 }
 @keyframes ripple { from { transform: scale(0.4); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+.stats .stats-head { margin-top: 6px; color: var(--text); font-weight: 600; }
