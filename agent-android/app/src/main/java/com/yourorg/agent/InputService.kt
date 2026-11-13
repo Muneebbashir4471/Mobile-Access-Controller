@@ -129,6 +129,12 @@ class InputService : AccessibilityService() {
                             else "Screen on.")
                     }
                     "unlock" -> unlock(ev.optString("secret"), reply)
+                    "lock" -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
+                            reply("Screen locked.")
+                        } else reply("Locking needs Android 9 or newer.")
+                    }
                     "tap" -> gesture(stroke(ev.getDouble("x"), ev.getDouble("y")), 50)
                     "long_press" -> gesture(
                         stroke(ev.getDouble("x"), ev.getDouble("y")),

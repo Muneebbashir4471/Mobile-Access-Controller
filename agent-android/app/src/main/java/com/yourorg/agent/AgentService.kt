@@ -99,6 +99,9 @@ class AgentService : Service() {
     private var lastConsentPrompt = 0L
     private var lastInputWarning = 0L
     private var screenWake: PowerManager.WakeLock? = null
+    // Held for the whole service lifetime so the WebSocket and video survive screen-off / Doze.
+    private var cpuWake: PowerManager.WakeLock? = null
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
 
     // Screen on/off and unlock change what the operator can do; report them straight away.
     private val screenReceiver = object : BroadcastReceiver() {
@@ -128,6 +131,7 @@ class AgentService : Service() {
         reporter = StatusReporter(this)
         goForeground("Starting…", withProjection = false)
         capture = CaptureManager(this) { scope.launch { onCaptureOrInputChanged() } }
+        acquireKeepAlive()
         getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(networkCallback)
         DeviceOwner.applyPolicies(this)
         ContextCompat.registerReceiver(this, screenReceiver, IntentFilter().apply {
@@ -165,6 +169,8 @@ class AgentService : Service() {
         runCatching { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(networkCallback) }
         runCatching { unregisterReceiver(screenReceiver) }
         screenWake?.let { if (it.isHeld) it.release() }
+        cpuWake?.let { if (it.isHeld) it.release() }
+        wifiLock?.let { if (it.isHeld) it.release() }
         sessions.values.forEach { it.close() }
         sessions.clear()
         ws?.close(1000, "service stopped")
@@ -399,6 +405,30 @@ class AgentService : Service() {
 
     private fun sendNotice(sid: String, message: String) {
         ws?.send(JSONObject().put("type", "notice").put("session_id", sid).put("message", message).toString())
+    }
+
+    /**
+     * Keeps the CPU and Wi-Fi radio awake for the whole service lifetime. Without this the phone
+     * enters Doze within seconds of the screen turning off, the radio powers down, and both the
+     * WebSocket and the live video die — the "disconnects when locked" symptom. The screen itself
+     * is allowed to turn off (that is fine; the stream keeps flowing), so this costs little battery
+     * on a charger.
+     */
+    @Suppress("DEPRECATION") // WifiLock HIGH_PERF is deprecated but is still the only way to pin the radio
+    private fun acquireKeepAlive() {
+        if (cpuWake?.isHeld != true) {
+            cpuWake = getSystemService(PowerManager::class.java)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "mt5agent:keepalive")
+                .also { it.setReferenceCounted(false); runCatching { it.acquire() } }
+        }
+        if (wifiLock?.isHeld != true) {
+            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+            else android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF
+            wifiLock = getSystemService(android.net.wifi.WifiManager::class.java)
+                .createWifiLock(mode, "mt5agent:keepalive")
+                .also { it.setReferenceCounted(false); runCatching { it.acquire() } }
+        }
     }
 
     /** Keeps the screen on while an operator is connected, so it cannot sleep mid-trade. */

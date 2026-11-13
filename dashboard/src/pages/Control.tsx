@@ -19,6 +19,7 @@ type InputEvent =
   | { type: "text"; value: string }
   | { type: "key"; name: "back" | "home" | "recents" | "enter" | "delete" }
   | { type: "wake" }
+  | { type: "lock" }
   | { type: "unlock"; secret: string };
 
 interface Stats {
@@ -460,6 +461,7 @@ export default function Control() {
             )}
             <div className="row">
               <button className="ghost" onClick={() => (send({ type: "wake" }), setNotice("Waking the screen…"))}>☀ Wake screen</button>
+              <button className="ghost" onClick={() => (send({ type: "lock" }), setNotice("Locking the screen…"))}>🔒 Lock screen</button>
             </div>
             <form onSubmit={unlock} className="row">
               <input type="password" autoComplete="off" placeholder="Phone PIN / password" value={secret}
