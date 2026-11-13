@@ -45,6 +45,7 @@ class AgentService : Service() {
 
     companion object {
         const val CHANNEL_ID = "agent"
+        const val UPDATE_CHANNEL_ID = "agent_updates"
         private const val NOTIF_ID = 1
         private const val TAG = "AgentService"
         private const val MIN_BACKOFF_MS = 1_000L

@@ -82,10 +82,30 @@ class InstallResultReceiver : BroadcastReceiver() {
         val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
         when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                // Not device owner: Android wants someone at the phone to confirm.
+                // Not device owner: Android wants someone at the phone to confirm. On Android 12+
+                // a background startActivity for that confirm dialog is blocked, so also post a
+                // high-priority notification the user can tap — a tap is user-initiated and allowed.
                 @Suppress("DEPRECATION")
                 val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
-                confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let { runCatching { context.startActivity(it) } }
+                    ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return
+                runCatching { context.startActivity(confirm) } // works when the app is in the foreground
+                val pi = PendingIntent.getActivity(
+                    context, 0, confirm,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+                val n = androidx.core.app.NotificationCompat.Builder(context, AgentService.UPDATE_CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                    .setContentTitle("Update ready to install")
+                    .setContentText("Tap to install the new MT5 Agent version.")
+                    .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                    .setCategory(androidx.core.app.NotificationCompat.CATEGORY_RECOMMENDATION)
+                    .setAutoCancel(true)
+                    .setContentIntent(pi)
+                    .setFullScreenIntent(pi, true)
+                    .build()
+                runCatching {
+                    androidx.core.app.NotificationManagerCompat.from(context).notify(42, n)
+                }
             }
             PackageInstaller.STATUS_SUCCESS -> Log.i("Updater", "update installed")
             else -> Log.w("Updater", "update failed: $status ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)}")
