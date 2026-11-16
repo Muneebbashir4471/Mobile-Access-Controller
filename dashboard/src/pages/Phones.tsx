@@ -1,11 +1,21 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../auth";
 import { ago, signalBars } from "../format";
 import type { Device } from "../types";
 import { useDevices } from "../useDevices";
 
 type Filter = "all" | "online" | "offline" | "free";
+
+/**
+ * Opens a phone's control view in its own pop-out window, like an SSH client opening each session in
+ * a separate window. The window is named per phone, so clicking the same phone again focuses the
+ * existing window instead of opening a duplicate (and the server allows only one viewer per phone).
+ */
+function openPhoneWindow(id: string) {
+  const win = window.open(`/control/${id}`, `mt5-phone-${id}`, "popup=yes,width=880,height=920");
+  win?.focus();
+}
 
 export default function Phones() {
   const { devices, error } = useDevices();
@@ -33,7 +43,6 @@ export default function Phones() {
       <div className="toolbar">
         <h2>Phones <span className="muted small">{online} of {devices.length} online</span></h2>
         <span className="spacer" />
-        {devices.length > 0 && <Link className="button ghost-link" to="/multi">⧉ Multi-view</Link>}
         {me.role === "admin" && devices.length > 0 && <Link className="button ghost-link" to="/devices?pair=1">+ Pair a phone</Link>}
         <input placeholder="Filter by name or carrier" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="seg">
@@ -61,14 +70,13 @@ export default function Phones() {
 }
 
 function PhoneCard({ d }: { d: Device }) {
-  const nav = useNavigate();
   const { me } = useAuth();
   const s = d.status;
   const mine = d.lock?.user_id === me.id;
   const bars = signalBars(s.signal);
   const lowBattery = typeof s.battery === "number" && s.battery < 20;
   return (
-    <button className={`phone card ${d.online ? "" : "offline"}`} disabled={!d.online} onClick={() => nav(`/control/${d.id}`)}>
+    <button className={`phone card ${d.online ? "" : "offline"}`} disabled={!d.online} onClick={() => openPhoneWindow(d.id)}>
       <div className="row">
         <span className={`dot ${d.online ? "ok" : "bad"}`} />
         <strong className="name">{d.name}</strong>

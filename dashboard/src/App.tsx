@@ -9,7 +9,6 @@ import Control from "./pages/Control";
 import Devices from "./pages/Devices";
 import History from "./pages/History";
 import Login from "./pages/Login";
-import MultiControl from "./pages/MultiControl";
 import Phones from "./pages/Phones";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
@@ -45,7 +44,6 @@ export default function App() {
     <AuthContext.Provider value={{ me, setMe, signOut }}>
       <Routes>
         <Route path="/control/:deviceId" element={<Control />} />
-        <Route path="/multi" element={<MultiControl />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Phones />} />
           <Route path="/accounts" element={<Accounts />} />

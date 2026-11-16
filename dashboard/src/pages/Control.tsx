@@ -61,10 +61,11 @@ const ENDED_TEXT: Record<string, string> = {
   connection: "Connection to the server was lost.",
 };
 
-export default function Control({ deviceId: propDeviceId, onClose }: { deviceId?: string; onClose?: () => void } = {}) {
-  const { deviceId: paramId = "" } = useParams();
-  const deviceId = propDeviceId ?? paramId;
-  const embedded = propDeviceId != null;
+export default function Control() {
+  const { deviceId = "" } = useParams();
+  // When opened in its own pop-out window (from the Phones list), the close button shuts the window
+  // instead of navigating this tab back to the list.
+  const popped = typeof window !== "undefined" && window.opener != null;
   const nav = useNavigate();
   const { me } = useAuth();
   const { devices } = useDevices();
@@ -402,7 +403,7 @@ export default function Control({ deviceId: propDeviceId, onClose }: { deviceId?
     if (sessionRef.current) live.send({ type: "close", session_id: sessionRef.current });
     sessionRef.current = null;
     teardown();
-    if (onClose) onClose();
+    if (popped) window.close();
     else nav("/");
   };
 
@@ -425,7 +426,7 @@ export default function Control({ deviceId: propDeviceId, onClose }: { deviceId?
   return (
     <div className="control">
       <aside className="panel">
-        <button className="ghost" onClick={release}>{embedded ? "✕ Close this phone" : "← Phones"}</button>
+        <button className="ghost" onClick={release}>{popped ? "✕ Close window" : "← Phones"}</button>
         <h2>{device?.name ?? "Phone"}</h2>
         {device && (
           <p className="muted small">
