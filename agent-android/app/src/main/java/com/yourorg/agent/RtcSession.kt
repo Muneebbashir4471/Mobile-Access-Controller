@@ -117,12 +117,17 @@ class RtcSession(
 
     private fun applyVideoLimits(params: RtpParameters): RtpParameters? {
         if (params.encodings.isEmpty()) return null
+        // Adaptive quality: WebRTC's congestion control is free to use anywhere from the low floor
+        // up to maxBitrate. On a good link it ramps up to full quality; on a weak/bufferbloating
+        // link (e.g. a 4G hotspot) it drops right down instead of overshooting and stalling.
         val maxBitrate = video.optInt("bitrate", 3_000_000)
         params.encodings[0].maxBitrateBps = maxBitrate
-        // A floor stops the encoder from starving itself (and stalling) while bandwidth is probed.
-        params.encodings[0].minBitrateBps = minOf(500_000, maxBitrate)
+        // Very low floor: never force more onto the link than it can carry. A high floor (the old
+        // 500 kbps) caused bufferbloat on weak links by refusing to adapt down.
+        params.encodings[0].minBitrateBps = minOf(100_000, maxBitrate)
         params.encodings[0].maxFramerate = video.optInt("fps", 30)
-        // Under pressure, trade a little of both rather than freezing on sharp-but-stale frames.
+        // BALANCED lets the encoder shed resolution AND frame rate together as bitrate falls, so a
+        // slow link degrades gracefully (smaller/softer but moving) instead of freezing.
         params.degradationPreference = RtpParameters.DegradationPreference.BALANCED
         return params
     }
