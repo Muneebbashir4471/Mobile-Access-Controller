@@ -61,8 +61,10 @@ const ENDED_TEXT: Record<string, string> = {
   connection: "Connection to the server was lost.",
 };
 
-export default function Control() {
-  const { deviceId = "" } = useParams();
+export default function Control({ deviceId: propDeviceId, onClose }: { deviceId?: string; onClose?: () => void } = {}) {
+  const { deviceId: paramId = "" } = useParams();
+  const deviceId = propDeviceId ?? paramId;
+  const embedded = propDeviceId != null;
   const nav = useNavigate();
   const { me } = useAuth();
   const { devices } = useDevices();
@@ -400,7 +402,8 @@ export default function Control() {
     if (sessionRef.current) live.send({ type: "close", session_id: sessionRef.current });
     sessionRef.current = null;
     teardown();
-    nav("/");
+    if (onClose) onClose();
+    else nav("/");
   };
 
   const retry = () => {
@@ -422,7 +425,7 @@ export default function Control() {
   return (
     <div className="control">
       <aside className="panel">
-        <button className="ghost" onClick={release}>← Phones</button>
+        <button className="ghost" onClick={release}>{embedded ? "✕ Close this phone" : "← Phones"}</button>
         <h2>{device?.name ?? "Phone"}</h2>
         {device && (
           <p className="muted small">

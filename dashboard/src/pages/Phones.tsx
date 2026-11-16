@@ -33,6 +33,7 @@ export default function Phones() {
       <div className="toolbar">
         <h2>Phones <span className="muted small">{online} of {devices.length} online</span></h2>
         <span className="spacer" />
+        {devices.length > 0 && <Link className="button ghost-link" to="/multi">⧉ Multi-view</Link>}
         {me.role === "admin" && devices.length > 0 && <Link className="button ghost-link" to="/devices?pair=1">+ Pair a phone</Link>}
         <input placeholder="Filter by name or carrier" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="seg">
