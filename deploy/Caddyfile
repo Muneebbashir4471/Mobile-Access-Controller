@@ -2,7 +2,8 @@
 	email {$ACME_EMAIL}
 }
 
-phones.{$DOMAIN} {
+# Dashboard over HTTPS on the domain (automatic Let's Encrypt cert).
+{$DASHBOARD_HOST} {
 	encode gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -24,4 +25,20 @@ phones.{$DOMAIN} {
 # Exists so Caddy obtains a certificate that coturn reuses for TLS on 5349.
 turn.{$DOMAIN} {
 	respond "turn" 200
+}
+
+# Direct access over plain HTTP by IP (no TLS) — so the server is reachable by
+# its public/LAN IP as well as the domain. Caddy still serves ACME challenges
+# for the domain above on port 80 regardless of this catch-all.
+http:// {
+	encode gzip
+	@backend path /api/* /ws/*
+	handle @backend {
+		reverse_proxy api:8000
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
 }

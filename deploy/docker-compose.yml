@@ -9,6 +9,7 @@ services:
     ports: ["80:80", "443:443"]
     environment:
       DOMAIN: ${DOMAIN}
+      DASHBOARD_HOST: ${DASHBOARD_HOST}
       ACME_EMAIL: ${ACME_EMAIL}
     volumes:
       - caddy_data:/data
@@ -21,9 +22,15 @@ services:
     environment:
       MT5_DATABASE_URL: postgresql+asyncpg://mt5:${POSTGRES_PASSWORD}@db:5432/mt5
       MT5_REDIS_URL: redis://cache:6379/0
-      MT5_PUBLIC_URL: https://phones.${DOMAIN}
+      MT5_PUBLIC_URL: https://${DASHBOARD_HOST}
+      # Allow reaching the dashboard by the domain (HTTPS) and by the public IP (HTTP) both.
+      MT5_EXTRA_ALLOWED_ORIGINS: '["http://${PUBLIC_IP}","http://${PUBLIC_IP}:80"]'
+      # false so login works over plain HTTP by IP too (cookies aren't HTTPS-only). Set to "true"
+      # if you will only ever use the HTTPS domain.
+      MT5_COOKIE_SECURE: "${COOKIE_SECURE:-false}"
       MT5_TURN_SECRET: ${TURN_SECRET}
-      MT5_TURN_URLS: '["turn:turn.${DOMAIN}:3478?transport=udp","turn:turn.${DOMAIN}:3478?transport=tcp","turns:turn.${DOMAIN}:5349?transport=tcp"]'
+      # Domain-based TURN (TLS on 5349) for internet clients, plus IP-based for direct/LAN clients.
+      MT5_TURN_URLS: '["turns:turn.${DOMAIN}:5349?transport=tcp","turn:turn.${DOMAIN}:3478?transport=udp","turn:turn.${DOMAIN}:3478?transport=tcp","turn:${PUBLIC_IP}:3478?transport=udp","turn:${PUBLIC_IP}:3478?transport=tcp"]'
       MT5_TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       MT5_TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     volumes:
