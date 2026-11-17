@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth";
 import { ago, signalBars } from "../format";
@@ -90,7 +90,6 @@ function PhoneCard({ d }: { d: Device }) {
           </span>
         )}
       </div>
-      <Thumb d={d} />
       <div className="meta">
         <span className={lowBattery ? "warn" : ""}>
           🔋 {s.battery ?? "–"}%{s.charging ? " ⚡" : ""}
@@ -124,29 +123,3 @@ function PhoneCard({ d }: { d: Device }) {
   );
 }
 
-const THUMB_EVERY_MS = 10_000;
-
-/** Small screenshot of the phone, refreshed every 10 s while it is online with the screen on.
- *  Each request also asks the phone for a fresh one, which the next refresh shows. */
-function Thumb({ d }: { d: Device }) {
-  const live = d.online && d.status.screen_on !== false;
-  const [tick, setTick] = useState(0);
-  const [ok, setOk] = useState(false);
-  useEffect(() => {
-    if (!live) return;
-    // Two quick polls first: the first request only asks the phone for a picture.
-    const first = window.setTimeout(() => setTick((t) => t + 1), 1500);
-    const t = window.setInterval(() => setTick((t) => t + 1), THUMB_EVERY_MS);
-    return () => (window.clearTimeout(first), window.clearInterval(t));
-  }, [live]);
-  if (!live) {
-    return <div className="thumb empty">{d.online ? "Screen off" : "Offline"}</div>;
-  }
-  return (
-    <div className={`thumb ${ok ? "" : "empty"}`}>
-      <img src={`/api/devices/${d.id}/thumb?t=${tick}`} alt="" loading="lazy"
-        onLoad={() => setOk(true)} onError={() => setOk(false)} />
-      {!ok && <span>Loading screen…</span>}
-    </div>
-  );
-}

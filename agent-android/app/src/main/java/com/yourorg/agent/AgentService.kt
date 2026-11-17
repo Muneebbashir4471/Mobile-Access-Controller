@@ -15,7 +15,6 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.os.SystemClock
-import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -360,20 +359,6 @@ class AgentService : Service() {
         }
     }
 
-    /** A small JPEG of the screen for the dashboard's phone grid. Skipped while the screen is off. */
-    private fun sendThumb(socket: WebSocket, width: Int) {
-        if (!getSystemService(PowerManager::class.java).isInteractive) return
-        val svc = InputService.instance ?: return
-        svc.thumbnail(width.coerceIn(120, 480)) { jpeg ->
-            if (jpeg != null) {
-                socket.send(
-                    JSONObject().put("type", "thumb")
-                        .put("jpeg", Base64.encodeToString(jpeg, Base64.NO_WRAP)).toString()
-                )
-            }
-        }
-    }
-
     private fun sendStatus(socket: WebSocket) {
         val msg = reporter.status(captureReady = capture.isRunning, inputReady = InputService.isReady)
             .put("capture_mode", capture.mode.name.lowercase())
@@ -394,7 +379,6 @@ class AgentService : Service() {
                 if (online) startHeartbeat(socket)
             }
             "session_start" -> startSession(socket, sid, msg)
-            "thumb_request" -> sendThumb(socket, msg.optInt("width", 270))
             "rtc_offer" -> sessions[sid]?.onOffer(msg.optString("sdp"))
             "ice" -> msg.optJSONObject("candidate")?.let { sessions[sid]?.onRemoteIce(it) }
             "session_stop" -> {

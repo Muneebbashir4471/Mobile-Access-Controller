@@ -44,8 +44,6 @@ class Settings(BaseSettings):
     # Alert when a phone stays in the 1 fps fallback (capture permission lost) this long.
     fallback_alert_seconds: int = 300
     low_battery_percent: int = 20
-    # Screen thumbnails on the Phones page: a cached one older than this triggers a fresh grab.
-    thumb_max_age_seconds: int = 8
     # 30 fps keeps input-to-screen delay low; the cap only matters while the screen changes a lot.
     default_video: dict = {"width": 720, "fps": 30, "bitrate": 3_000_000}
 

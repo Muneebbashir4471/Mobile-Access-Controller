@@ -258,25 +258,6 @@ def test_superuser_outranks_admin(client):
     assert client.post("/api/users", json={**new, "email": "a3@example.com", "role": "admin"}).status_code == 201
 
 
-def test_thumbnail_is_requested_from_the_phone_and_served(client):
-    import base64
-    _admin(client)
-    dev = pair_device(client)
-    url = f"/api/devices/{dev['device_id']}/thumb"
-    jpeg = b"\xff\xd8 fake jpeg"
-    with _agent(client, dev["token"]) as agent:
-        agent.receive_json()  # config
-        assert client.get(url).status_code == 204  # nothing cached yet; the phone is asked
-        assert _recv_until(agent, "thumb_request")["width"] > 0
-        agent.send_json({"type": "thumb", "jpeg": base64.b64encode(jpeg).decode()})
-        for _ in range(50):
-            r = client.get(url)
-            if r.status_code == 200:
-                break
-            time.sleep(0.05)
-    assert r.status_code == 200 and r.content == jpeg and r.headers["content-type"] == "image/jpeg"
-
-
 def test_fallback_alert_after_grace_period(client, monkeypatch):
     from app.config import get_settings
     _admin(client)

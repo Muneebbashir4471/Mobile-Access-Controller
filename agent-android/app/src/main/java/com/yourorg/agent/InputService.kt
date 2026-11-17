@@ -114,37 +114,6 @@ class InputService : AccessibilityService() {
         return false
     }
 
-    // Thumbnails ------------------------------------------------------------------
-
-    private val thumbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
-
-    /** One small JPEG of the screen for the dashboard's phone grid (Android 11+). [done] gets null
-     *  if the system refused (screenshots are rate limited, e.g. while 1 fps fallback runs). */
-    fun thumbnail(width: Int, done: (ByteArray?) -> Unit) {
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) return done(null)
-        takeScreenshot(android.view.Display.DEFAULT_DISPLAY, thumbExecutor, object : AccessibilityService.TakeScreenshotCallback {
-            override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
-                val jpeg = runCatching {
-                    val hw = android.graphics.Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
-                    result.hardwareBuffer.close()
-                    if (hw == null) return@runCatching null
-                    val soft = hw.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                    hw.recycle()
-                    val height = (soft.height.toLong() * width / soft.width).toInt().coerceAtLeast(1)
-                    val small = android.graphics.Bitmap.createScaledBitmap(soft, width, height, true)
-                    if (small !== soft) soft.recycle()
-                    val out = java.io.ByteArrayOutputStream()
-                    small.compress(android.graphics.Bitmap.CompressFormat.JPEG, 60, out)
-                    small.recycle()
-                    out.toByteArray()
-                }.getOrNull()
-                done(jpeg)
-            }
-
-            override fun onFailure(errorCode: Int) = done(null)
-        })
-    }
-
     // Input events --------------------------------------------------------------
 
     /** Handles one data-channel event. Safe to call from any thread. [reply] sends a short

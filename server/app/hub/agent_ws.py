@@ -3,7 +3,6 @@
 import asyncio
 import json
 import logging
-import time
 import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -13,7 +12,7 @@ from ..config import get_settings
 from ..db import session_factory
 from ..deps import client_ip
 from ..models import Device, utcnow
-from ..redis_state import get_redis, k_presence, k_session, k_thumb
+from ..redis_state import get_redis, k_presence, k_session
 from ..security import hash_token
 from . import alerts
 from .bus import bus
@@ -22,8 +21,6 @@ from .sessions import end_device_session, end_session
 
 log = logging.getLogger(__name__)
 router = APIRouter()
-
-MAX_THUMB_B64 = 200_000  # a 270 px wide JPEG is ~15 KB; anything far bigger is ignored
 
 STATUS_FIELDS = (
     "battery", "charging", "signal", "carrier", "network_type", "capture_ready", "input_ready",
@@ -156,15 +153,6 @@ async def _handle(conn: AgentConn, msg: dict) -> None:
             await broadcast_device(d)
             if kind == "status":
                 await alerts.check_status(d, d.last_status)
-        return
-
-    if kind == "thumb":
-        # A small JPEG of the screen for the Phones page, sent when the hub asks for one.
-        jpeg = msg.get("jpeg")
-        if isinstance(jpeg, str) and 0 < len(jpeg) <= MAX_THUMB_B64:
-            await get_redis().set(
-                k_thumb(conn.device_id), json.dumps({"jpeg": jpeg, "at": time.time()}), ex=300
-            )
         return
 
     session_id = str(msg.get("session_id", ""))

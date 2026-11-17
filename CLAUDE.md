@@ -112,8 +112,8 @@ Built in Docker (image `mt5-android-build`), never with a local Gradle. Versione
    - Debug-signed with a **stable** keystore in `agent-android/.build-home/.android/debug.keystore`
      — all builds share one signing identity (required for clean OTA updates). Do not delete it.
 
-Version history: 0.3.2 → 0.4.0 → 0.4.1 → 0.5.0 → 0.5.1 → … → 0.5.5 → **0.6.0** (latest,
-versionCode 14: self-healing capture, screen thumbnails, Device Owner QR setup).
+Version history: 0.3.2 → 0.4.0 → 0.4.1 → 0.5.0 → 0.5.1 → … → 0.5.5 → 0.6.0 (never deployed) → **0.6.1** (latest,
+versionCode 15: self-healing capture, Device Owner QR setup).
 
 ## Updating the app (manual install — no OTA)
 

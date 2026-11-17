@@ -1,10 +1,7 @@
-import base64
-import json
-import time
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +14,7 @@ from ..hub.bus import bus
 from ..hub.devices import broadcast_device, device_snapshot, effective_video
 from ..hub.sessions import end_device_session
 from ..models import Device, Mt5Account, PairingCode, User, aware, utcnow
-from ..redis_state import get_redis, k_presence, k_thumb, k_thumb_req, rate_limit
+from ..redis_state import rate_limit
 from .agent_updates import DOWNLOAD_PATH, latest_release
 from ..security import hash_token, new_pairing_code, new_token, normalize_pairing_code
 
@@ -97,27 +94,6 @@ async def provisioning_qr(body: ProvisionIn, admin: User = Depends(require_admin
             "qr_payload": payload}
 
 
-@router.get("/devices/{device_id}/thumb")
-async def device_thumb(device_id: uuid.UUID, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
-    """Latest small screenshot of the phone for the Phones page. When the cached one is stale the
-    phone is asked for a new one, which the next poll picks up."""
-    visible = await visible_device_ids(db, user)
-    if visible is not None and device_id not in visible:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such device")
-    await _get_device(db, device_id)
-    s = get_settings()
-    r = get_redis()
-    did = str(device_id)
-    raw = await r.get(k_thumb(did))
-    cached = json.loads(raw) if raw else None
-    stale = cached is None or time.time() - cached["at"] > s.thumb_max_age_seconds
-    if stale and await r.exists(k_presence(did)) and \
-            await r.set(k_thumb_req(did), "1", nx=True, ex=s.thumb_max_age_seconds):
-        await bus.to_agent(did, {"type": "thumb_request", "width": 270})
-    if cached is None:
-        return Response(status_code=204)
-    return Response(base64.b64decode(cached["jpeg"]), media_type="image/jpeg",
-                    headers={"Cache-Control": "no-store"})
 
 
 class PairIn(BaseModel):

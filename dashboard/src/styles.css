@@ -312,15 +312,6 @@ a.button.ghost-link:hover { background: var(--surface-2); border-color: var(--ac
 *::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
 *::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
 
-/* Phone screen thumbnail on the Phones page */
-.thumb {
-  position: relative; height: 160px; border-radius: 10px; overflow: hidden;
-  background: var(--screen); border: 1px solid var(--border);
-  display: grid; place-items: center; color: #8a93a4; font-size: 12px;
-}
-.thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.thumb.empty img { display: none; }
-
 /* Device Owner setup panel */
 .provision { display: grid; gap: 12px; }
 .provision ol { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
