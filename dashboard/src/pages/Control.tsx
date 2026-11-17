@@ -320,6 +320,20 @@ export default function Control() {
       if (act) {
         e.preventDefault();
         act();
+        return;
+      }
+      // Typing: send each character straight to the phone's focused field over the data
+      // channel (same low-latency path as taps). Backspace/Enter map to device keys.
+      if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser/system shortcuts alone
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        send({ type: "key", name: "delete" });
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        send({ type: "key", name: "enter" });
+      } else if (e.key.length === 1) {
+        e.preventDefault();
+        send({ type: "text", value: e.key });
       }
     };
     window.addEventListener("keydown", onKey);
