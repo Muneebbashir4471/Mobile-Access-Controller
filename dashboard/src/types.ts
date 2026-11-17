@@ -5,6 +5,8 @@ export interface Me {
   email: string;
   role: Role;
   totp_enabled: boolean;
+  /** Admin or superuser who must turn on two-factor login before admin features unlock. */
+  must_enable_2fa?: boolean;
 }
 
 export interface DeviceStatus {

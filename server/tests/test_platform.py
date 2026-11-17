@@ -183,29 +183,107 @@ def test_account_search_respects_assignment(client):
     assert res[0]["device_id"] == d1["device_id"]
 
 
-def test_agent_update_release_and_download(client):
-    _admin(client)
-    dev = pair_device(client)
-    headers = {"Authorization": f"Bearer {dev['token']}"}
-    assert client.get("/api/agent/latest", headers=headers).status_code == 204
-    assert client.get("/api/agent/latest").status_code == 401
+APK = b"PK\x03\x04" + b"fake apk body" * 100
 
-    apk = b"PK\x03\x04" + b"fake apk body" * 100
-    with _agent(client, dev["token"]) as agent:
-        agent.receive_json()  # config
-        r = client.post("/api/agent/releases", data={"version_code": "2", "version_name": "0.2.0"},
-                        files={"apk": ("agent.apk", apk, "application/octet-stream")})
-        assert r.status_code == 201, r.text
-        assert _recv_until(agent, "update_available")["version_code"] == 2
 
-    latest = client.get("/api/agent/latest", headers=headers).json()
+def _upload_apk(client, code="2"):
+    return client.post("/api/agent/releases", data={"version_code": code, "version_name": f"0.{code}.0"},
+                       files={"apk": ("agent.apk", APK, "application/octet-stream")})
+
+
+def test_agent_apk_upload_and_public_download(client):
     import hashlib
-    assert latest["sha256"] == hashlib.sha256(apk).hexdigest()
-    body = client.get(latest["url"], headers=headers)
-    assert body.status_code == 200 and body.content == apk
-    assert client.get(latest["url"]).status_code == 401
+    assert client.get("/api/agent/download/agent.apk").status_code == 404
+    _admin(client)
+    r = _upload_apk(client)
+    assert r.status_code == 201, r.text
+    assert r.json()["sha256"] == hashlib.sha256(APK).hexdigest()
     # Same or lower version is refused; non-APK refused.
-    assert client.post("/api/agent/releases", data={"version_code": "2", "version_name": "x"},
-                       files={"apk": ("a.apk", apk)}).status_code == 400
+    assert _upload_apk(client, "2").status_code == 400
     assert client.post("/api/agent/releases", data={"version_code": "3", "version_name": "x"},
                        files={"apk": ("a.apk", b"not a zip")}).status_code == 400
+    # A factory-reset phone has no token: the download is public.
+    client.post("/api/auth/logout")
+    body = client.get("/api/agent/download/agent.apk")
+    assert body.status_code == 200 and body.content == APK
+
+
+def test_device_owner_provisioning_qr_pairs_the_phone(client):
+    _admin(client)
+    assert client.post("/api/devices/provisioning-qr", json={}).status_code == 400  # no APK yet
+    _upload_apk(client)
+    r = client.post("/api/devices/provisioning-qr", json={"wifi_ssid": "Office", "wifi_password": "secret-pass"})
+    assert r.status_code == 200, r.text
+    p = r.json()["qr_payload"]
+    x = "android.app.extra."
+    assert p[x + "PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME"] == "com.yourorg.agent/.AdminReceiver"
+    assert p[x + "PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION"] == "https://testserver/api/agent/download/agent.apk"
+    assert p[x + "PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM"]
+    assert p[x + "PROVISIONING_WIFI_SSID"] == "Office" and p[x + "PROVISIONING_WIFI_SECURITY_TYPE"] == "WPA"
+    extras = p[x + "PROVISIONING_ADMIN_EXTRAS_BUNDLE"]
+    assert extras["server"] == "https://testserver"
+    # The embedded one-time code pairs the phone once setup finishes.
+    r = client.post("/api/devices/pair", json={"code": extras["code"], "model": "Pixel 8", "android_version": "15",
+                                               "app_version": "0.6.0"})
+    assert r.status_code == 200, r.text
+
+
+def test_admin_must_turn_on_2fa(client):
+    add_user(client, "boss@example.com", "admin", totp_enabled=False)
+    me = client.post("/api/auth/login", json={"email": "boss@example.com", "password": PASSWORD}).json()
+    assert me["must_enable_2fa"] is True
+    # Admin features and phones stay locked; Settings (2FA setup) still works.
+    assert client.post("/api/devices/pairing-codes").status_code == 403
+    assert client.get("/api/devices").json() == []
+    secret = client.post("/api/auth/2fa/setup").json()["secret"]
+    me = client.post("/api/auth/2fa/enable", json={"code": pyotp.TOTP(secret).now()}).json()
+    assert me["must_enable_2fa"] is False
+    assert client.post("/api/devices/pairing-codes").status_code == 200
+    # And an admin cannot switch it off again.
+    r = client.post("/api/auth/2fa/disable", json={"password": PASSWORD, "code": pyotp.TOTP(secret).now()})
+    assert r.status_code == 400
+
+
+def test_superuser_outranks_admin(client):
+    admin_id = _admin(client)
+    new = {"password": PASSWORD}
+    assert client.post("/api/users", json={**new, "email": "a2@example.com", "role": "admin"}).status_code == 403
+    assert client.post("/api/users", json={**new, "email": "s2@example.com", "role": "superuser"}).status_code == 403
+    assert client.post("/api/users", json={**new, "email": "op2@example.com", "role": "operator"}).status_code == 201
+    sid, ssecret = add_user(client, "owner@example.com", "superuser")
+    assert client.patch(f"/api/users/{sid}", json={"active": False}).status_code == 403
+    client.post("/api/auth/logout")
+    login(client, "owner@example.com", ssecret)
+    assert client.patch(f"/api/users/{admin_id}", json={"role": "operator"}).status_code == 200
+    assert client.post("/api/users", json={**new, "email": "a3@example.com", "role": "admin"}).status_code == 201
+
+
+def test_thumbnail_is_requested_from_the_phone_and_served(client):
+    import base64
+    _admin(client)
+    dev = pair_device(client)
+    url = f"/api/devices/{dev['device_id']}/thumb"
+    jpeg = b"\xff\xd8 fake jpeg"
+    with _agent(client, dev["token"]) as agent:
+        agent.receive_json()  # config
+        assert client.get(url).status_code == 204  # nothing cached yet; the phone is asked
+        assert _recv_until(agent, "thumb_request")["width"] > 0
+        agent.send_json({"type": "thumb", "jpeg": base64.b64encode(jpeg).decode()})
+        for _ in range(50):
+            r = client.get(url)
+            if r.status_code == 200:
+                break
+            time.sleep(0.05)
+    assert r.status_code == 200 and r.content == jpeg and r.headers["content-type"] == "image/jpeg"
+
+
+def test_fallback_alert_after_grace_period(client, monkeypatch):
+    from app.config import get_settings
+    _admin(client)
+    dev = pair_device(client)
+    monkeypatch.setattr(get_settings(), "fallback_alert_seconds", 0)
+    with client.websocket_connect("/ws/operator") as op, _agent(client, dev["token"]) as agent:
+        agent.receive_json()  # config
+        agent.send_json({**STATUS, "capture_mode": "fallback"})
+        alert = _recv_until(op, "alert", limit=50)
+        assert alert["kind"] == "fallback" and "1 fps" in alert["message"]

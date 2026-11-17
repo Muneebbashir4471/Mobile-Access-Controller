@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth";
 import { live } from "../live";
 
@@ -41,6 +41,14 @@ export default function Layout() {
         <span className="muted small">{me.email}</span>
         <button className="ghost" onClick={signOut}>Sign out</button>
       </header>
+      {me.must_enable_2fa && (
+        <div className="alerts">
+          <div className="alert">
+            <span>Admin accounts must use two-factor login. Phones and admin pages stay locked until you turn it on.</span>
+            <Link className="button" to="/settings">Turn on two-factor login</Link>
+          </div>
+        </div>
+      )}
       {alerts.length > 0 && (
         <div className="alerts">
           {alerts.map((a) => (

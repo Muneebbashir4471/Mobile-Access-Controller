@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     login_lockout_seconds: int = 900
     login_rate_per_minute: int = 20
     pairing_rate_per_minute: int = 10
+    # Admins and superusers must turn on two-factor login before admin features unlock.
+    require_admin_2fa: bool = True
 
     # Devices and sessions
     pairing_code_ttl_seconds: int = 600
@@ -39,13 +41,23 @@ class Settings(BaseSettings):
     heartbeat_seconds: int = 60
     presence_ttl_seconds: int = 90
     offline_alert_seconds: int = 180
+    # Alert when a phone stays in the 1 fps fallback (capture permission lost) this long.
+    fallback_alert_seconds: int = 300
     low_battery_percent: int = 20
+    # Screen thumbnails on the Phones page: a cached one older than this triggers a fresh grab.
+    thumb_max_age_seconds: int = 8
     # 30 fps keeps input-to-screen delay low; the cap only matters while the screen changes a lot.
     default_video: dict = {"width": 720, "fps": 30, "bitrate": 3_000_000}
 
     # Agent APK releases (a Docker volume in production)
     apk_dir: str = "/data/apk"
     max_apk_bytes: int = 200 * 1024 * 1024
+
+    # Device Owner QR setup. URL-safe base64 SHA-256 of the agent's signing certificate. It never
+    # changes because every build is signed with the same keystore (agent-android/.build-home).
+    agent_signature_checksum: str = "uK-flQVozeyfTX22q4CffRzSRJ0HDgS9hGLo9e2dkHk"
+    # A factory reset + setup wizard takes a while, so setup QR codes live longer than pairing codes.
+    provisioning_code_ttl_seconds: int = 3600
 
     # Alerts (optional)
     telegram_bot_token: str | None = None

@@ -3,6 +3,10 @@
 Do these once per phone, in this order. Menu names are from OnePlus / OxygenOS. Other brands
 use similar names.
 
+> **Dedicated phones: use the Device Owner setup QR instead** (dashboard → Devices → Device Owner
+> setup QR, on a factory-reset phone). It replaces steps 1, 2 and 4–6 below; only step 3
+> (Accessibility) is still done by hand. See `docs/runbook.md` → Phone setup.
+
 ## 1. Pair
 1. Open **MT5 Agent**.
 2. On the dashboard: **Devices → Pair a new phone**.

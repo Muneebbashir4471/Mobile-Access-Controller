@@ -3,12 +3,18 @@
 # Dashboard: http://<LAN_IP>:8090   (phones pair against the same address)
 name: mt5-lan
 
+# Cap container logs so they cannot fill the disk: at most 3 files of 10 MB per container.
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+
 services:
   web:
     build:
       context: ..
       dockerfile: deploy/web.Dockerfile
     restart: unless-stopped
+    logging: *logging
     ports: ["${WEB_PORT:-8090}:8090"]
     volumes:
       - ./Caddyfile.lan:/etc/caddy/Caddyfile:ro
@@ -17,11 +23,14 @@ services:
   api:
     build: ../server
     restart: unless-stopped
+    logging: *logging
     environment:
       MT5_DATABASE_URL: postgresql+asyncpg://mt5:${POSTGRES_PASSWORD}@db:5432/mt5
       MT5_REDIS_URL: redis://cache:6379/0
       MT5_PUBLIC_URL: http://${LAN_IP}:${WEB_PORT:-8090}
       MT5_EXTRA_ALLOWED_ORIGINS: '["http://localhost:${WEB_PORT:-8090}","http://127.0.0.1:${WEB_PORT:-8090}"]'
+      # Admins/superusers must turn on 2FA. Set REQUIRE_ADMIN_2FA=false only to recover access.
+      MT5_REQUIRE_ADMIN_2FA: "${REQUIRE_ADMIN_2FA:-true}"
       MT5_COOKIE_SECURE: "false"
       MT5_TURN_SECRET: ${TURN_SECRET}
       MT5_TURN_URLS: '["turn:${LAN_IP}:3478?transport=udp","turn:${LAN_IP}:3478?transport=tcp"]'
@@ -36,6 +45,7 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_USER: mt5
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -48,6 +58,7 @@ services:
   cache:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *logging
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -56,6 +67,7 @@ services:
   turn:
     image: coturn/coturn:4.6.3
     restart: unless-stopped
+    logging: *logging
     # Published ports (not host networking) so Docker opens them past the host firewall (ufw).
     # Relay ports map 1:1, so the advertised LAN_IP:port is reachable as-is.
     ports:

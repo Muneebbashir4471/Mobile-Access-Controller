@@ -21,5 +21,7 @@ class AgentApp : Application() {
                 lockscreenVisibility = android.app.Notification.VISIBILITY_SECRET
             }
         )
+        // Finish pairing from a Device Owner setup QR if the app restarted before it completed.
+        Provisioning.resume(this)
     }
 }

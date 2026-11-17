@@ -1,7 +1,10 @@
+import base64
+import json
+import time
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +17,8 @@ from ..hub.bus import bus
 from ..hub.devices import broadcast_device, device_snapshot, effective_video
 from ..hub.sessions import end_device_session
 from ..models import Device, Mt5Account, PairingCode, User, aware, utcnow
-from ..redis_state import rate_limit
+from ..redis_state import get_redis, k_presence, k_thumb, k_thumb_req, rate_limit
+from .agent_updates import DOWNLOAD_PATH, latest_release
 from ..security import hash_token, new_pairing_code, new_token, normalize_pairing_code
 
 router = APIRouter(prefix="/api", tags=["devices"])
@@ -52,6 +56,68 @@ async def create_pairing_code(admin: User = Depends(require_admin), db: AsyncSes
         # Encoded into the QR the agent scans.
         "qr_payload": {"server": s.public_url, "code": code},
     }
+
+
+class ProvisionIn(BaseModel):
+    wifi_ssid: str | None = Field(None, max_length=64)
+    wifi_password: str | None = Field(None, max_length=128)
+
+
+@router.post("/devices/provisioning-qr")
+async def provisioning_qr(body: ProvisionIn, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Android Device Owner setup QR. Scanned on a factory-reset phone (tap the welcome screen six
+    times), it downloads the agent APK, makes it device owner and pairs it with an embedded
+    one-time code, so the phone comes up unkillable, without a lock screen and already paired."""
+    s = get_settings()
+    release = latest_release()
+    if release is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "Upload the agent APK first (Devices page, Agent APK) so new phones can download it")
+    code = new_pairing_code()
+    expires = utcnow() + timedelta(seconds=s.provisioning_code_ttl_seconds)
+    db.add(PairingCode(code_hash=hash_token(code), created_by=admin.id, expires_at=expires))
+    audit(db, "provisioning_qr_created", admin.id, None, {"expires_at": expires.isoformat()})
+    await db.commit()
+    base = s.public_url.rstrip("/")
+    extra = "android.app.extra."
+    payload: dict = {
+        extra + "PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.yourorg.agent/.AdminReceiver",
+        extra + "PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": base + DOWNLOAD_PATH,
+        extra + "PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": s.agent_signature_checksum,
+        # Keep Play Store and the rest: the phone still needs to install and run MT5.
+        extra + "PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED": True,
+        extra + "PROVISIONING_ADMIN_EXTRAS_BUNDLE": {"server": base, "code": code},
+    }
+    if body.wifi_ssid:
+        payload[extra + "PROVISIONING_WIFI_SSID"] = body.wifi_ssid
+        payload[extra + "PROVISIONING_WIFI_SECURITY_TYPE"] = "WPA" if body.wifi_password else "NONE"
+        if body.wifi_password:
+            payload[extra + "PROVISIONING_WIFI_PASSWORD"] = body.wifi_password
+    return {"code": code, "expires_at": expires.isoformat(), "apk_version": release["version_name"],
+            "qr_payload": payload}
+
+
+@router.get("/devices/{device_id}/thumb")
+async def device_thumb(device_id: uuid.UUID, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+    """Latest small screenshot of the phone for the Phones page. When the cached one is stale the
+    phone is asked for a new one, which the next poll picks up."""
+    visible = await visible_device_ids(db, user)
+    if visible is not None and device_id not in visible:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such device")
+    await _get_device(db, device_id)
+    s = get_settings()
+    r = get_redis()
+    did = str(device_id)
+    raw = await r.get(k_thumb(did))
+    cached = json.loads(raw) if raw else None
+    stale = cached is None or time.time() - cached["at"] > s.thumb_max_age_seconds
+    if stale and await r.exists(k_presence(did)) and \
+            await r.set(k_thumb_req(did), "1", nx=True, ex=s.thumb_max_age_seconds):
+        await bus.to_agent(did, {"type": "thumb_request", "width": 270})
+    if cached is None:
+        return Response(status_code=204)
+    return Response(base64.b64decode(cached["jpeg"]), media_type="image/jpeg",
+                    headers={"Cache-Control": "no-store"})
 
 
 class PairIn(BaseModel):

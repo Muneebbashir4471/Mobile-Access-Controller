@@ -1,11 +1,17 @@
 name: mt5-phones
 
+# Cap container logs so they cannot fill the disk: at most 3 files of 10 MB per container.
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+
 services:
   web:
     build:
       context: ..
       dockerfile: deploy/web.Dockerfile
     restart: unless-stopped
+    logging: *logging
     ports: ["80:80", "443:443"]
     environment:
       DASHBOARD_HOST: ${DASHBOARD_HOST}
@@ -18,12 +24,15 @@ services:
   api:
     build: ../server
     restart: unless-stopped
+    logging: *logging
     environment:
       MT5_DATABASE_URL: postgresql+asyncpg://mt5:${POSTGRES_PASSWORD}@db:5432/mt5
       MT5_REDIS_URL: redis://cache:6379/0
       MT5_PUBLIC_URL: https://${DASHBOARD_HOST}
       # Allow reaching the dashboard by the domain (HTTPS) and by the public IP (HTTP) both.
       MT5_EXTRA_ALLOWED_ORIGINS: '["http://${PUBLIC_IP}","http://${PUBLIC_IP}:80"]'
+      # Admins/superusers must turn on 2FA. Set REQUIRE_ADMIN_2FA=false only to recover access.
+      MT5_REQUIRE_ADMIN_2FA: "${REQUIRE_ADMIN_2FA:-true}"
       # false so login works over plain HTTP by IP too (cookies aren't HTTPS-only). Set to "true"
       # if you will only ever use the HTTPS domain.
       MT5_COOKIE_SECURE: "${COOKIE_SECURE:-false}"
@@ -41,6 +50,7 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_USER: mt5
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -53,6 +63,7 @@ services:
   cache:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *logging
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -61,8 +72,8 @@ services:
   turn:
     image: coturn/coturn:4.6.3
     restart: unless-stopped
+    logging: *logging
     network_mode: host
-    # Root is needed to read Caddy's certificate files from the shared volume.
     user: root
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf:ro

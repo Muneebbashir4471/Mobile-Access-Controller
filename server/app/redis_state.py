@@ -56,6 +56,14 @@ def k_alert(kind: str, device_id: str) -> str:
     return f"alerted:{kind}:{device_id}"
 
 
+def k_thumb(device_id: str) -> str:           # json {"jpeg": base64, "at": epoch}; short TTL
+    return f"thumb:{device_id}"
+
+
+def k_thumb_req(device_id: str) -> str:       # throttles thumbnail requests sent to the phone
+    return f"thumbreq:{device_id}"
+
+
 async def rate_limit(key: str, limit: int, window_seconds: int) -> bool:
     """Fixed-window counter. Returns True while under the limit."""
     r = get_redis()

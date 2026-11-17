@@ -50,4 +50,18 @@ object Prefs {
 
     fun rememberServer(ctx: Context, url: String) = get(ctx).edit().putString("last_server", url).apply()
     fun lastServer(ctx: Context): String? = get(ctx).getString("last_server", null)
+
+    /** Server and one-time code from a Device Owner setup QR, kept until pairing succeeds. */
+    fun savePendingPairing(ctx: Context, server: String, code: String) =
+        get(ctx).edit().putString("pending_server", server).putString("pending_code", code).apply()
+
+    fun pendingPairing(ctx: Context): Pair<String, String>? {
+        val p = get(ctx)
+        val server = p.getString("pending_server", null) ?: return null
+        val code = p.getString("pending_code", null) ?: return null
+        return server to code
+    }
+
+    fun clearPendingPairing(ctx: Context) =
+        get(ctx).edit().remove("pending_server").remove("pending_code").apply()
 }

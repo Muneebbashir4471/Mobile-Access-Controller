@@ -8,3 +8,6 @@ dashboard/dist/
 deploy/.env.lan
 releases/
 dashboard/*.tsbuildinfo
+
+# Local database dumps from deploy/backup.sh
+deploy/backups/

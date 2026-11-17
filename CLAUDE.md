@@ -50,18 +50,29 @@ docker compose -f docker-compose.lan.yml --env-file .env.lan ps
   are automatic. DB is `postgres:16-alpine`, cache is `redis:7-alpine`, turn is `coturn/coturn:4.6.3`.
 - **Finding the current IP:** `ip -4 -o addr show | awk '{print $2,$4}' | grep -v 'lo\|docker\|br-\|veth'`.
   Use the real LAN interface (e.g. `wlp0s20f3`), NOT a VPN interface like `muneeb`/`10.8.0.x`.
-- Production compose is `deploy/docker-compose.yml` (host-networked coturn, Caddy TLS). Prefer the
-  `.lan.yml` stack for local work.
+- Production compose is `deploy/docker-compose.yml` (host-networked coturn, Caddy TLS for the
+  dashboard). Prefer the `.lan.yml` stack for local work. Never run both stacks on one server: the
+  second coturn steals port 3478.
+
+### Production (EC2)
+
+`deploy/.env` (template `deploy/.env.example`) needs `DASHBOARD_HOST` (HTTPS dashboard, its DNS A
+record → the server), `ACME_EMAIL`, `PUBLIC_IP` (TURN advertises it; dashboard/API also answer on
+`http://<PUBLIC_IP>`), `COOKIE_SECURE`, `REQUIRE_ADMIN_2FA`, `POSTGRES_PASSWORD`, `TURN_SECRET`.
+There is no `DOMAIN` and no `turn.` subdomain: coturn runs plain (`--no-tls`) on the IP.
+Security group: TCP 80/443, UDP+TCP 3478, UDP 49160–49200. Full steps: `docs/runbook.md`.
 
 ### First-time admin user
 
 Auth is **session-cookie based** (login returns the user JSON + sets a cookie; there is no bearer
-token). 2FA (TOTP) is **optional**, off by default.
+token). Roles: **superuser** > **admin** > **operator**. Admins and superusers **must** turn on
+TOTP 2FA (Settings) before admin features unlock and phones show (`REQUIRE_ADMIN_2FA`, default
+true; set false only to recover access). Operators' 2FA is optional.
 
 ```bash
 cd deploy
 docker compose -f docker-compose.lan.yml --env-file .env.lan exec api \
-  python -m app.cli create-admin admin@mt5.local
+  python -m app.cli create-superuser owner@mt5.local     # or create-admin
 ```
 
 Credentials are secrets — never commit them. The working admin login is held outside the repo.
@@ -82,7 +93,7 @@ LAN IP — only the api container needs `LAN_IP` (for `PUBLIC_URL`, CORS, and TU
 
 ```bash
 cd server
-pytest                                   # 9 tests, spins up Postgres schema itself
+pytest                                   # 14 tests; SQLite + fakeredis, needs requirements-dev.txt
 python -m loadtest.simulate              # 30 phones / 10 operators; admin TOTP optional
 ```
 
@@ -101,7 +112,8 @@ Built in Docker (image `mt5-android-build`), never with a local Gradle. Versione
    - Debug-signed with a **stable** keystore in `agent-android/.build-home/.android/debug.keystore`
      — all builds share one signing identity (required for clean OTA updates). Do not delete it.
 
-Version history: 0.3.2 → 0.4.0 → 0.4.1 → 0.5.0 → **0.5.1** (latest, versionCode 9).
+Version history: 0.3.2 → 0.4.0 → 0.4.1 → 0.5.0 → 0.5.1 → … → 0.5.5 → **0.6.0** (latest,
+versionCode 14: self-healing capture, screen thumbnails, Device Owner QR setup).
 
 ## Updating the app (manual install — no OTA)
 
@@ -119,8 +131,14 @@ To ship a new version: bump the version, `./build-apk.sh`, and give the client t
   → phone opens `http://<LAN_IP>:8099/mt5-agent-<v>.apk`.
 - Or over USB: `adb install -r releases/mt5-agent-<v>.apk`.
 
-(The server still has the `/api/agent/releases` upload + the dashboard's release page, now unused by
-the agent — harmless, can be ignored or removed later.)
+The dashboard's Devices → Agent APK upload stores the APK that **Device Owner QR setup** installs
+(public download at `/api/agent/download/agent.apk`). Upload each new release there too.
+
+### Backups and logs
+
+`deploy/install-backup-cron.sh` installs a nightly `deploy/backup.sh` (dumps to `deploy/backups/`,
+gitignored, 14 days; `BACKUP_BUCKET=s3://…` also copies to S3). Container logs are capped at
+3 × 10 MB via the `x-logging` anchor in both compose files.
 
 ### Inspect devices / presence (Postgres + Redis)
 
@@ -148,8 +166,10 @@ docker compose -f docker-compose.lan.yml --env-file .env.lan exec -T cache redis
   deploy/provision-phone.sh path/to/mt5-agent-<v>.apk http://<LAN_IP>:8090 <PAIRCODE> [adb-serial]
   # core step: adb shell dpm set-device-owner com.yourorg.agent/.AdminReceiver
   ```
-  For a no-cable fleet flow, use **QR device-owner provisioning** (factory reset → tap welcome 6× →
-  scan QR). The APK signature checksum for the QR = url-safe base64 of the signing cert SHA-256.
+  No-cable fleet flow: dashboard **Devices → Device Owner setup QR** (factory reset → tap welcome
+  6× → scan). The QR embeds a one-time pairing code; the agent pairs itself
+  (`Provisioning.kt`). Accessibility must still be enabled by hand. The signing-cert checksum is
+  `agent_signature_checksum` in `server/app/config.py` (constant: one stable keystore).
 
 ## Conventions / gotchas
 

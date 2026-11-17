@@ -1,5 +1,6 @@
 package com.yourorg.agent
 
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
@@ -14,6 +15,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.os.SystemClock
+import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -51,6 +53,10 @@ class AgentService : Service() {
         private const val MAX_BACKOFF_MS = 60_000L
         private const val EXTRA_CONSENT = "capture_consent"
         private const val CONSENT_RETRY_MS = 60_000L
+        // Retrying on a dark screen means waking it, so do that less often.
+        private const val WAKE_RETRY_MS = 5 * 60_000L
+        // Our own wake-up fires SCREEN_ON; don't let that trigger a second prompt.
+        private const val PROMPT_GUARD_MS = 5_000L
         private const val FALLBACK_AFTER_MS = 20_000L
 
         @Volatile private var running: AgentService? = null
@@ -105,7 +111,17 @@ class AgentService : Service() {
     // Screen on/off and unlock change what the operator can do; report them straight away.
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            scope.launch { ws?.let { sendStatus(it) } }
+            val unlocked = intent.action == Intent.ACTION_USER_PRESENT ||
+                (intent.action == Intent.ACTION_SCREEN_ON &&
+                    !getSystemService(KeyguardManager::class.java).isKeyguardLocked)
+            scope.launch {
+                // A consent prompt cannot show on a dark or locked screen. The moment the phone is
+                // usable again, retry right away instead of waiting for the next heartbeat.
+                if (unlocked && ::capture.isInitialized && capture.mode != CaptureManager.Mode.PROJECTION) {
+                    ensureCapture(force = true)
+                }
+                ws?.let { sendStatus(it) }
+            }
         }
     }
 
@@ -184,18 +200,46 @@ class AgentService : Service() {
      * Gets capture running without anyone at the phone: prompt for consent (InputService
      * presses the button), and if that has not worked after a while, use the 1 fps fallback.
      */
-    private fun ensureCapture() {
+    private fun ensureCapture(force: Boolean = false) {
         if (capture.mode == CaptureManager.Mode.PROJECTION) return
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastConsentPrompt > CONSENT_RETRY_MS && !CaptureConsentActivity.awaitingConsent) {
-            lastConsentPrompt = now
-            CaptureConsentActivity.launch(this)
-        }
+        if (!CaptureConsentActivity.awaitingConsent) maybePromptForConsent(force)
         if (capture.mode == CaptureManager.Mode.NONE && fallbackJob?.isActive != true) {
             fallbackJob = scope.launch {
                 delay(FALLBACK_AFTER_MS)
                 if (capture.mode == CaptureManager.Mode.NONE) capture.startFallback(video.optInt("width", 720))
             }
+        }
+    }
+
+    /**
+     * Shows the capture consent dialog; InputService presses its confirm button. The dialog cannot
+     * appear over a dark or locked screen, so the screen is woken first and a swipe lock dismissed.
+     * A PIN/password lock has to wait until someone unlocks the phone (USER_PRESENT retries then).
+     * [force] skips the retry interval, for when someone is at the phone or watching it.
+     */
+    private fun maybePromptForConsent(force: Boolean) {
+        val km = getSystemService(KeyguardManager::class.java)
+        val pm = getSystemService(PowerManager::class.java)
+        if (km.isKeyguardLocked && km.isKeyguardSecure) return
+        val needsWake = !pm.isInteractive || km.isKeyguardLocked
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastConsentPrompt < PROMPT_GUARD_MS) return
+        if (!force) {
+            // Nobody could press the button on a dark screen without the accessibility service.
+            if (needsWake && !InputService.isReady) return
+            if (now - lastConsentPrompt < if (needsWake) WAKE_RETRY_MS else CONSENT_RETRY_MS) return
+        }
+        lastConsentPrompt = now
+        if (needsWake) {
+            WakeActivity.launch(this)
+            scope.launch {
+                delay(1_500) // let the screen come on and the swipe lock go away
+                if (capture.mode != CaptureManager.Mode.PROJECTION && !CaptureConsentActivity.awaitingConsent) {
+                    CaptureConsentActivity.launch(this@AgentService)
+                }
+            }
+        } else {
+            CaptureConsentActivity.launch(this)
         }
     }
 
@@ -316,6 +360,20 @@ class AgentService : Service() {
         }
     }
 
+    /** A small JPEG of the screen for the dashboard's phone grid. Skipped while the screen is off. */
+    private fun sendThumb(socket: WebSocket, width: Int) {
+        if (!getSystemService(PowerManager::class.java).isInteractive) return
+        val svc = InputService.instance ?: return
+        svc.thumbnail(width.coerceIn(120, 480)) { jpeg ->
+            if (jpeg != null) {
+                socket.send(
+                    JSONObject().put("type", "thumb")
+                        .put("jpeg", Base64.encodeToString(jpeg, Base64.NO_WRAP)).toString()
+                )
+            }
+        }
+    }
+
     private fun sendStatus(socket: WebSocket) {
         val msg = reporter.status(captureReady = capture.isRunning, inputReady = InputService.isReady)
             .put("capture_mode", capture.mode.name.lowercase())
@@ -336,6 +394,7 @@ class AgentService : Service() {
                 if (online) startHeartbeat(socket)
             }
             "session_start" -> startSession(socket, sid, msg)
+            "thumb_request" -> sendThumb(socket, msg.optInt("width", 270))
             "rtc_offer" -> sessions[sid]?.onOffer(msg.optString("sdp"))
             "ice" -> msg.optJSONObject("candidate")?.let { sessions[sid]?.onRemoteIce(it) }
             "session_stop" -> {
@@ -363,6 +422,14 @@ class AgentService : Service() {
         msg.optJSONObject("video")?.let { video = it }
         // Turn the screen on (over a swipe lock) so the operator sees the phone, not a black frame.
         WakeActivity.launch(this)
+        if (capture.mode == CaptureManager.Mode.FALLBACK) {
+            // Stuck at 1 fps: ask for capture again now. Both modes feed the same video track, so
+            // the operator's view switches to live video without reconnecting.
+            scope.launch {
+                delay(1_500)
+                ensureCapture(force = true)
+            }
+        }
         try {
             sessions[sid] = RtcSession(
                 sessionId = sid,

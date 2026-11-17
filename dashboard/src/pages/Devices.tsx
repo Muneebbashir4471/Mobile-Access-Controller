@@ -16,6 +16,7 @@ export default function Devices() {
   const { devices, error } = useDevices();
   const [pairing, setPairing] = useState<PairingCode | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [provisioning, setProvisioning] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -42,8 +43,11 @@ export default function Devices() {
       <div className="toolbar">
         <h2>Devices</h2>
         <span className="spacer" />
+        <button className="ghost" onClick={() => setProvisioning(true)}>Device Owner setup QR</button>
         <button onClick={newCode}>Pair a new phone</button>
       </div>
+
+      {provisioning && <ProvisionPanel onClose={() => setProvisioning(false)} />}
 
       {pairing && (
         <div className="card pairing">
@@ -240,7 +244,7 @@ function AgentRelease() {
       const data = await res.json();
       if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
       setCurrent(data);
-      setMsg("Published. Online phones without an open session update now; the rest within 6 hours.");
+      setMsg("Uploaded. Phones set up with the Device Owner QR from now on install this version.");
     } catch (err: any) {
       setMsg(err.message);
     } finally {
@@ -251,17 +255,86 @@ function AgentRelease() {
   return (
     <details className="card release">
       <summary>
-        Agent app release:{" "}
-        {current.version_name ? <strong>{current.version_name} (code {current.version_code})</strong> : <span className="muted">none published</span>}
+        Agent APK for Device Owner setup:{" "}
+        {current.version_name ? <strong>{current.version_name} (code {current.version_code})</strong> : <span className="muted">none uploaded</span>}
       </summary>
       <form className="row wrap" onSubmit={upload}>
         <input type="number" min={1} placeholder="versionCode" value={code} onChange={(e) => setCode(e.target.value)} required />
         <input placeholder="versionName, e.g. 0.2.0" value={name} onChange={(e) => setName(e.target.value)} required />
         <input type="file" accept=".apk" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required />
-        <button type="submit" disabled={busy}>{busy ? "Uploading…" : "Publish"}</button>
+        <button type="submit" disabled={busy}>{busy ? "Uploading…" : "Upload"}</button>
       </form>
-      <p className="muted small">Signed release APK with a higher versionCode than the installed one. Phones verify the SHA-256 before installing.</p>
+      <p className="muted small">
+        Upload <span className="mono">releases/mt5-agent-&lt;version&gt;.apk</span> with its versionCode. The Device Owner
+        setup QR installs this file on new phones. Phones already running are updated by installing the new APK by hand.
+      </p>
       {msg && <p className="small">{msg}</p>}
     </details>
+  );
+}
+
+interface Provision {
+  code: string;
+  expires_at: string;
+  apk_version: string;
+  qr_payload: Record<string, unknown>;
+}
+
+/** Android Device Owner setup QR for a factory-reset phone. */
+function ProvisionPanel({ onClose }: { onClose: () => void }) {
+  const [ssid, setSsid] = useState("");
+  const [password, setPassword] = useState("");
+  const [data, setData] = useState<Provision | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const make = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      setError(null);
+      setData(await api<Provision>("/api/devices/provisioning-qr", {
+        method: "POST",
+        body: { wifi_ssid: ssid || null, wifi_password: password || null },
+      }));
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <div className="card provision">
+      <div className="row">
+        <h3 style={{ margin: 0 }}>Device Owner setup</h3>
+        <span className="spacer" />
+        <button className="ghost" onClick={onClose}>×</button>
+      </div>
+      <p className="muted small">
+        Recommended for dedicated phones. The agent becomes the phone's owner: Android can't kill or uninstall it,
+        the lock screen is off and its permissions are granted automatically. Needs a factory-reset phone with no
+        Google account.
+      </p>
+      <form className="row wrap" onSubmit={make}>
+        <input placeholder="Wi-Fi name (optional)" value={ssid} onChange={(e) => setSsid(e.target.value)} />
+        <input type="password" placeholder="Wi-Fi password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <button type="submit">{data ? "Make a new QR" : "Create setup QR"}</button>
+      </form>
+      {error && <p className="error">{error}</p>}
+      {data && (
+        <div className="pairing">
+          <Qr value={JSON.stringify(data.qr_payload)} size={300} />
+          <div>
+            <ol>
+              <li>Factory-reset the phone. Do not add a Google account.</li>
+              <li>On the first welcome screen, tap the same empty spot 6 times. A QR scanner opens.</li>
+              <li>Scan this code. The phone joins Wi-Fi, downloads agent {data.apk_version} and sets it up as owner.</li>
+              <li>When setup finishes, open the agent and turn on its Accessibility service. Android only allows this step by hand.</li>
+            </ol>
+            <p className="muted small">
+              The phone pairs itself with the one-time code inside this QR. One phone only, valid until{" "}
+              {new Date(data.expires_at).toLocaleTimeString()}.{ssid ? " The QR contains the Wi-Fi password, so don't share it." : ""}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .auth_sessions import COOKIE_NAME, resolve_session
+from .config import get_settings
 from .db import get_db
 from .models import Assignment, User
 
@@ -31,13 +32,21 @@ async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> 
 ADMIN_ROLES = {"admin", "superuser"}
 
 
+def needs_2fa(user: User) -> bool:
+    """True for an admin or superuser who has not turned on two-factor login yet. Until they do,
+    admin features stay locked and they see no phones; Settings (to turn it on) still works."""
+    return user.role in ADMIN_ROLES and get_settings().require_admin_2fa and not user.totp_enabled
+
+
 async def require_admin(user: User = Depends(current_user)) -> User:
     if user.role not in ADMIN_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin only")
+    if needs_2fa(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Turn on two-factor login in Settings to use admin features")
     return user
 
 
-async def require_superuser(user: User = Depends(current_user)) -> User:
+async def require_superuser(user: User = Depends(require_admin)) -> User:
     if user.role != "superuser":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Superuser only")
     return user
@@ -46,7 +55,7 @@ async def require_superuser(user: User = Depends(current_user)) -> User:
 async def visible_device_ids(db: AsyncSession, user: User) -> set[uuid.UUID] | None:
     """None means every device (admins and superusers)."""
     if user.role in ADMIN_ROLES:
-        return None
+        return set() if needs_2fa(user) else None
     rows = await db.scalars(select(Assignment.device_id).where(Assignment.user_id == user.id))
     return set(rows)
 

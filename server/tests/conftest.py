@@ -47,17 +47,21 @@ def run(client, coro_fn, *args):
     return client.portal.call(coro_fn, *args)
 
 
-async def _add_user(email: str, role: str) -> tuple[str, str]:
+async def _add_user(email: str, role: str, totp_enabled: bool) -> tuple[str, str]:
     secret = pyotp.random_base32()
     async with dbmod.session_factory()() as db:
-        u = User(id=uuid.uuid4(), email=email, password_hash=hash_password(PASSWORD), totp_secret=secret, role=role)
+        u = User(id=uuid.uuid4(), email=email, password_hash=hash_password(PASSWORD), totp_secret=secret,
+                 totp_enabled=totp_enabled, role=role)
         db.add(u)
         await db.commit()
         return str(u.id), secret
 
 
-def add_user(client, email, role="operator"):
-    return run(client, _add_user, email, role)
+def add_user(client, email, role="operator", totp_enabled=None):
+    # Admins and superusers must have two-factor login on, so test admins get it by default.
+    if totp_enabled is None:
+        totp_enabled = role in ("admin", "superuser")
+    return run(client, _add_user, email, role, totp_enabled)
 
 
 def login(client, email, secret):

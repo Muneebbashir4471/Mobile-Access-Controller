@@ -340,6 +340,21 @@ export default function Control() {
     return () => window.removeEventListener("keydown", onKey);
   }, [page, scroll, send]);
 
+  // Paste (Ctrl/Cmd+V) over the control view types the clipboard text into the phone's focused
+  // field in one go — handy for long account numbers and passwords.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!sessionRef.current || (t && ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+      const text = e.clipboardData?.getData("text") ?? "";
+      if (!text) return;
+      e.preventDefault();
+      send({ type: "text", value: text.slice(0, 2000) });
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [send]);
+
   /** Pointer position as fractions of the phone screen, accounting for letterboxing. */
   const toScreen = (e: PointerEvent<HTMLVideoElement>): { x: number; y: number } | null => {
     const v = e.currentTarget;

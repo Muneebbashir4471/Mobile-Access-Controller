@@ -26,16 +26,16 @@ a rebrand of RustDesk/scrcpy/AnyDesk.
 ```
 
 1. **Android agent** (`agent-android/`) — Kotlin foreground service. Captures the screen via
-   MediaProjection (WebRTC video), accepts input via AccessibilityService, self-updates, and can run
-   as device owner. Details in **`AGENT.md`**.
+   MediaProjection (WebRTC video), accepts input via AccessibilityService, and can run as device
+   owner (set up from a dashboard QR). It does not update itself; new versions are installed by hand. Details in **`AGENT.md`**.
 
 2. **Server / hub** (`server/`) — FastAPI (async). REST API + a WebSocket **hub** that relays
    signaling/input between operators and agents. PostgreSQL (SQLAlchemy 2 async + Alembic) for
    devices/users/accounts/assignments/audit; Redis for presence, device locks, auth sessions, and a
-   cross-worker pub/sub bus; coturn for WebRTC TURN relay. Argon2 passwords; optional TOTP 2FA.
+   cross-worker pub/sub bus; coturn for WebRTC TURN relay. Argon2 passwords; TOTP 2FA (required for admins and superusers).
 
 3. **Dashboard** (`dashboard/`) — React 18 + TypeScript + Vite. Pages: `Login`, `Phones` (fleet),
-   `Control` (live view + input + stats), `Devices` (pairing + releases), `Accounts`, `Assignments`
+   `Control` (live view + keyboard/paste input + stats), `Devices` (pairing, Device Owner setup QR, agent APK), `Accounts`, `Assignments`
    via `Users`, `History`, `Settings` (2FA).
 
 All wired together with **Docker Compose** + Caddy (`deploy/`).
@@ -53,9 +53,12 @@ All wired together with **Docker Compose** + Caddy (`deploy/`).
 
 ## Status
 
-- Server + dashboard: implemented and tested (`pytest` 9 passing; load test 30 phones/10 operators).
-- Android agent: implemented (capture/input/updater/device-owner/wake-unlock-lock); latest release
-  **0.5.1** (versionCode 9).
+- Server + dashboard: implemented and tested (`pytest` 14 passing; load test 30 phones/10 operators).
+  Roles: superuser > admin > operator. Phone grid shows live screen thumbnails.
+- Android agent: implemented (capture/input/device-owner QR setup/wake-unlock-lock/self-healing
+  capture); latest release **0.6.0** (versionCode 14).
+- Production: Docker Compose on EC2, dashboard on an HTTPS domain, TURN on the public IP
+  (see `docs/runbook.md`).
 - Runs on the LAN stack; real-world use is on dedicated phones. The main operational challenge is
   keeping phones in live `projection` capture — solved properly only by **device owner** provisioning
   (see `AGENT.md` and `CLAUDE.md`). Milestone/acceptance status: `docs/pilot-and-acceptance.md`.

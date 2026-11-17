@@ -7,7 +7,7 @@ from ..audit import audit
 from ..auth_sessions import COOKIE_NAME, create_session, destroy_session
 from ..config import get_settings
 from ..db import get_db
-from ..deps import client_ip, current_user
+from ..deps import ADMIN_ROLES, client_ip, current_user, needs_2fa
 from ..models import User
 from ..redis_state import get_redis, k_login_fail, rate_limit
 from ..security import DUMMY_PASSWORD_HASH, new_totp_secret, totp_uri, verify_password, verify_totp
@@ -34,7 +34,8 @@ class DisableIn(BaseModel):
 
 
 def user_out(u: User) -> dict:
-    return {"id": str(u.id), "email": u.email, "role": u.role, "active": u.active, "totp_enabled": u.totp_enabled}
+    return {"id": str(u.id), "email": u.email, "role": u.role, "active": u.active, "totp_enabled": u.totp_enabled,
+            "must_enable_2fa": needs_2fa(u)}
 
 
 async def _code_ok(user: User, code: str) -> bool:
@@ -140,6 +141,8 @@ async def enable_2fa(body: CodeIn, user: User = Depends(current_user), db: Async
 async def disable_2fa(body: DisableIn, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
     if not user.totp_enabled:
         return user_out(user)
+    if user.role in ADMIN_ROLES and get_settings().require_admin_2fa:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Admin accounts must keep two-factor login on")
     if not verify_password(user.password_hash, body.password) or not await _code_ok(user, body.code):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Wrong password or code")
     user.totp_enabled = False
