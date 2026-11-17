@@ -458,6 +458,8 @@ class AgentService : Service() {
             .setContentText(text)
             .setOngoing(true)
             .setSilent(true)
+            .setShowWhen(false)
+            .setPriority(NotificationCompat.PRIORITY_MIN) // pre-Android 8 equivalent of IMPORTANCE_MIN
             .setContentIntent(open)
             .build()
     }
