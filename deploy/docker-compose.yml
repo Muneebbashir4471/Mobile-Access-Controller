@@ -8,7 +8,6 @@ services:
     restart: unless-stopped
     ports: ["80:80", "443:443"]
     environment:
-      DOMAIN: ${DOMAIN}
       DASHBOARD_HOST: ${DASHBOARD_HOST}
       ACME_EMAIL: ${ACME_EMAIL}
     volumes:
@@ -29,8 +28,8 @@ services:
       # if you will only ever use the HTTPS domain.
       MT5_COOKIE_SECURE: "${COOKIE_SECURE:-false}"
       MT5_TURN_SECRET: ${TURN_SECRET}
-      # Domain-based TURN (TLS on 5349) for internet clients, plus IP-based for direct/LAN clients.
-      MT5_TURN_URLS: '["turns:turn.${DOMAIN}:5349?transport=tcp","turn:turn.${DOMAIN}:3478?transport=udp","turn:turn.${DOMAIN}:3478?transport=tcp","turn:${PUBLIC_IP}:3478?transport=udp","turn:${PUBLIC_IP}:3478?transport=tcp"]'
+      # IP-based TURN only: the agent connects to the backend by public IP, and video relays over it.
+      MT5_TURN_URLS: '["turn:${PUBLIC_IP}:3478?transport=udp","turn:${PUBLIC_IP}:3478?transport=tcp"]'
       MT5_TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       MT5_TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     volumes:
@@ -67,15 +66,14 @@ services:
     user: root
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
-      - caddy_data:/caddy-data:ro
     command:
       - -c
       - /etc/coturn/turnserver.conf
       - --static-auth-secret=${TURN_SECRET}
-      - --realm=turn.${DOMAIN}
+      - --realm=mt5
       - --external-ip=${PUBLIC_IP}
-      - --cert=/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/turn.${DOMAIN}/turn.${DOMAIN}.crt
-      - --pkey=/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/turn.${DOMAIN}/turn.${DOMAIN}.key
+      - --no-tls
+      - --no-dtls
 
 volumes:
   apk:
