@@ -45,7 +45,6 @@ class AgentService : Service() {
 
     companion object {
         const val CHANNEL_ID = "agent"
-        const val UPDATE_CHANNEL_ID = "agent_updates"
         private const val NOTIF_ID = 1
         private const val TAG = "AgentService"
         private const val MIN_BACKOFF_MS = 1_000L
@@ -53,7 +52,6 @@ class AgentService : Service() {
         private const val EXTRA_CONSENT = "capture_consent"
         private const val CONSENT_RETRY_MS = 60_000L
         private const val FALLBACK_AFTER_MS = 20_000L
-        private const val UPDATE_CHECK_MS = 6 * 3600_000L
 
         @Volatile private var running: AgentService? = null
 
@@ -110,8 +108,6 @@ class AgentService : Service() {
             scope.launch { ws?.let { sendStatus(it) } }
         }
     }
-    private var updating = false
-    private var lastUpdateCheckMs = 0L
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -141,7 +137,6 @@ class AgentService : Service() {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_USER_PRESENT)
         }, ContextCompat.RECEIVER_NOT_EXPORTED)
-        scope.launch { updateLoop() }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -275,8 +270,6 @@ class AgentService : Service() {
         )
         sendStatus(socket)
         startHeartbeat(socket)
-        // Catch updates published while this phone was offline (at most once every 15 min).
-        scope.launch { maybeRunUpdate(15 * 60_000L) }
     }
 
     private fun onDisconnected(code: Int, reason: String) {
@@ -351,7 +344,6 @@ class AgentService : Service() {
             }
             // Input over the WebSocket when the data channel is down.
             "input" -> if (sessions.containsKey(sid)) msg.optJSONObject("event")?.let(::onInput)
-            "update_available" -> scope.launch { runUpdate() }
             else -> Log.d(TAG, "ignored message ${msg.optString("type")}")
         }
     }
@@ -444,38 +436,6 @@ class AgentService : Service() {
             .newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "mt5agent:session")
             .also { it.setReferenceCounted(false); screenWake = it }
         if (want && !lock.isHeld) lock.acquire(4 * 3600_000L) else if (!want && lock.isHeld) lock.release()
-    }
-
-    // Updates ---------------------------------------------------------------------
-
-    private suspend fun updateLoop() {
-        delay(60_000) // let the connection settle after boot
-        while (true) {
-            runUpdate()
-            delay(UPDATE_CHECK_MS)
-        }
-    }
-
-    /** Checks only if we have not checked recently, so frequent reconnects on a flaky link do not
-     *  hammer the server. Used when the socket (re)connects, so a phone that was offline when an
-     *  update was published still picks it up as soon as it comes back. */
-    private suspend fun maybeRunUpdate(minIntervalMs: Long) {
-        if (SystemClock.elapsedRealtime() - lastUpdateCheckMs < minIntervalMs) return
-        runUpdate()
-    }
-
-    private suspend fun runUpdate() {
-        val c = creds ?: return
-        if (updating || sessions.isNotEmpty()) return // never restart under an operator
-        updating = true
-        lastUpdateCheckMs = SystemClock.elapsedRealtime()
-        try {
-            Log.i(TAG, "update check: " + Updater.checkAndInstall(this, c))
-        } catch (e: Exception) {
-            Log.w(TAG, "update check failed", e)
-        } finally {
-            updating = false
-        }
     }
 
     // Notification -------------------------------------------------------------

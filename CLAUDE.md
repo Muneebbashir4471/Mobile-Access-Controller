@@ -103,34 +103,24 @@ Built in Docker (image `mt5-android-build`), never with a local Gradle. Versione
 
 Version history: 0.3.2 → 0.4.0 → 0.4.1 → 0.5.0 → **0.5.1** (latest, versionCode 9).
 
-## Publishing an update (OTA)
+## Updating the app (manual install — no OTA)
 
-Phones self-update via the agent updater. Publish a built APK to the server, then push a signal.
+**As of 0.5.4 the agent does NOT self-update.** By design, a finished app is shipped and runs for its
+lifespan; when something changes, build a new APK and have the client install it by hand. The
+in-app updater, the `update_available` push handling, and the `REQUEST_INSTALL_PACKAGES` permission
+were removed (dropping that permission also makes the app look less like spyware to Play Protect).
 
-```bash
-cd deploy
-JAR=$(mktemp)
-curl -s -c "$JAR" -X POST http://<LAN_IP>:8090/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"admin@mt5.local","password":"<PW>"}' >/dev/null
-curl -s -b "$JAR" -X POST http://<LAN_IP>:8090/api/agent/releases \
-  -F version_code=9 -F version_name=0.5.1 \
-  -F apk=@../releases/mt5-agent-0.5.1.apk            # 201 Created
-rm -f "$JAR"
+To ship a new version: bump the version, `./build-apk.sh`, and give the client the APK from
+`releases/`. They install it over the old one (pairing and settings survive). Installing manually:
+- **Copy + tap** the APK on the phone (enable "install unknown apps" for the file manager/browser;
+  if Play Protect blocks it, Play Store → profile → Play Protect → turn off the scan).
+- Or serve it on the LAN so the phone's browser downloads it (no cable):
+  `python3 -m http.server 8099 --bind <LAN_IP> --directory releases`
+  → phone opens `http://<LAN_IP>:8099/mt5-agent-<v>.apk`.
+- Or over USB: `adb install -r releases/mt5-agent-<v>.apk`.
 
-# Push "update_available" to one online phone (device id from the DB):
-docker compose -f docker-compose.lan.yml --env-file .env.lan exec -T cache \
-  redis-cli publish hub:agent:<device_id> '{"type":"update_available","version_code":9}'
-```
-
-- The agent checks on start, every 6h, and on the `update_available` push. It will NOT update while
-  an operator session is open (`sessions.isNotEmpty()` guard).
-- **Known limit:** on a non-device-owner phone the final install needs a user tap, and on Android 12+
-  that confirm dialog is suppressed from the background. 0.5.1 adds a tap-to-install **notification**
-  so the user can confirm. The app must be in the foreground for the direct dialog to appear.
-- Serving an APK over plain HTTP for manual install (no cable):
-  `python3 -m http.server 8099 --bind <LAN_IP> --directory releases` → phone browser downloads
-  `http://<LAN_IP>:8099/mt5-agent-<v>.apk`.
+(The server still has the `/api/agent/releases` upload + the dashboard's release page, now unused by
+the agent — harmless, can be ignored or removed later.)
 
 ### Inspect devices / presence (Postgres + Redis)
 
