@@ -197,3 +197,10 @@ a.button.ghost-link { background: transparent; color: var(--text); border: 1px s
 @keyframes ripple { from { transform: scale(0.4); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
 .stats .stats-head { margin-top: 6px; color: var(--text); font-weight: 600; }
 
+
+/* Prominent fallback (1 fps) warning on a phone card */
+.phone.card.degraded { border-color: #e0a500; box-shadow: inset 3px 0 0 #e0a500; }
+.badge-warn {
+  margin-left: auto; font-size: 11px; font-weight: 700; color: #111; background: #f5c344;
+  padding: 1px 6px; border-radius: 6px; white-space: nowrap;
+}

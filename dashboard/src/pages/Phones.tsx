@@ -76,10 +76,19 @@ function PhoneCard({ d }: { d: Device }) {
   const bars = signalBars(s.signal);
   const lowBattery = typeof s.battery === "number" && s.battery < 20;
   return (
-    <button className={`phone card ${d.online ? "" : "offline"}`} disabled={!d.online} onClick={() => openPhoneWindow(d.id)}>
+    <button
+      className={`phone card ${d.online ? "" : "offline"} ${d.online && s.capture_mode === "fallback" ? "degraded" : ""}`}
+      disabled={!d.online}
+      onClick={() => openPhoneWindow(d.id)}
+    >
       <div className="row">
         <span className={`dot ${d.online ? "ok" : "bad"}`} />
         <strong className="name">{d.name}</strong>
+        {d.online && s.capture_mode === "fallback" && (
+          <span className="badge-warn" title="1 frame/sec fallback — screen capture consent is missing. Do not trade until recovered.">
+            ⚠ 1 FPS
+          </span>
+        )}
       </div>
       <div className="meta">
         <span className={lowBattery ? "warn" : ""}>

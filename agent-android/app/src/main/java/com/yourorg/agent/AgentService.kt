@@ -111,6 +111,7 @@ class AgentService : Service() {
         }
     }
     private var updating = false
+    private var lastUpdateCheckMs = 0L
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -205,6 +206,7 @@ class AgentService : Service() {
 
     private fun onCaptureOrInputChanged() {
         AgentState.setCaptureReady(capture.isRunning)
+        AgentState.setCaptureMode(capture.mode.name.lowercase())
         if (capture.mode == CaptureManager.Mode.NONE) {
             // Projection was stopped: the open session's track is dead, so end it cleanly.
             sessions.values.toList().forEach { it.end("screen capture stopped on the phone") }
@@ -273,6 +275,8 @@ class AgentService : Service() {
         )
         sendStatus(socket)
         startHeartbeat(socket)
+        // Catch updates published while this phone was offline (at most once every 15 min).
+        scope.launch { maybeRunUpdate(15 * 60_000L) }
     }
 
     private fun onDisconnected(code: Int, reason: String) {
@@ -452,10 +456,19 @@ class AgentService : Service() {
         }
     }
 
+    /** Checks only if we have not checked recently, so frequent reconnects on a flaky link do not
+     *  hammer the server. Used when the socket (re)connects, so a phone that was offline when an
+     *  update was published still picks it up as soon as it comes back. */
+    private suspend fun maybeRunUpdate(minIntervalMs: Long) {
+        if (SystemClock.elapsedRealtime() - lastUpdateCheckMs < minIntervalMs) return
+        runUpdate()
+    }
+
     private suspend fun runUpdate() {
         val c = creds ?: return
         if (updating || sessions.isNotEmpty()) return // never restart under an operator
         updating = true
+        lastUpdateCheckMs = SystemClock.elapsedRealtime()
         try {
             Log.i(TAG, "update check: " + Updater.checkAndInstall(this, c))
         } catch (e: Exception) {

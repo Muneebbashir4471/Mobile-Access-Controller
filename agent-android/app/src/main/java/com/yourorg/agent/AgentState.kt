@@ -15,8 +15,17 @@ object AgentState {
     private val _captureReady = MutableStateFlow(false)
     val captureReady: StateFlow<Boolean> = _captureReady
 
+    // "none" | "projection" (live) | "fallback" (1 fps). Lets the checklist tell live capture apart
+    // from the degraded fallback instead of showing a misleading green tick for both.
+    private val _captureMode = MutableStateFlow("none")
+    val captureMode: StateFlow<String> = _captureMode
+
     fun setCaptureReady(ready: Boolean) {
         _captureReady.value = ready
+    }
+
+    fun setCaptureMode(mode: String) {
+        _captureMode.value = mode
     }
 
     fun set(c: Conn, detail: String = "") {

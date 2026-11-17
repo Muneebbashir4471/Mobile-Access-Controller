@@ -170,7 +170,15 @@ class PairingActivity : AppCompatActivity() {
         step("Accessibility service (remote input)", InputService.isReady) {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
-        step("Screen capture running", captureReady()) {
+        // Distinguish live projection from the degraded 1 fps fallback: both "run", but only
+        // projection is good. Fallback is shown as not-done so the Fix button offers live capture.
+        val mode = AgentState.captureMode.value
+        val (captureLabel, captureOk) = when (mode) {
+            "projection" -> "Screen capture running (live)" to true
+            "fallback" -> "Screen capture is in 1 fps fallback — tap Fix for live video" to false
+            else -> "Screen capture running" to false
+        }
+        step(captureLabel, captureOk) {
             CaptureConsentActivity.launch(this)
         }
         text(
@@ -206,9 +214,6 @@ class PairingActivity : AppCompatActivity() {
             .setNegativeButton("Cancel", null)
             .show()
     }
-
-    /** Read from the status the service last sent; good enough for a checklist tick. */
-    private fun captureReady() = AgentState.captureReady.value
 
     private fun notificationsAllowed() =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || hasPermission(Manifest.permission.POST_NOTIFICATIONS)
