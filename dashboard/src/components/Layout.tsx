@@ -23,7 +23,7 @@ export default function Layout() {
     [],
   );
 
-  const admin = me.role === "admin";
+  const admin = me.role === "admin" || me.role === "superuser";
   return (
     <div className="app">
       <header className="topbar">

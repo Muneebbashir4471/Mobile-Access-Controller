@@ -39,7 +39,7 @@ export default function App() {
   if (me === undefined) return <div className="center muted">Loading…</div>;
   if (me === null) return <Login onSignedIn={setMe} />;
 
-  const admin = me.role === "admin";
+  const admin = me.role === "admin" || me.role === "superuser";
   return (
     <AuthContext.Provider value={{ me, setMe, signOut }}>
       <Routes>

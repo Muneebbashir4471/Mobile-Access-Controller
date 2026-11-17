@@ -1,10 +1,16 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth";
-import type { Device, UserRow } from "../types";
+import type { Device, Role, UserRow } from "../types";
+
+const ROLE_LABEL: Record<Role, string> = { operator: "Operator", admin: "Admin", superuser: "Superuser" };
 
 export default function Users() {
   const { me } = useAuth();
+  const isSuper = me.role === "superuser";
+  // A superuser manages everyone; an admin may only touch operators.
+  const canManage = (u: UserRow) => isSuper || u.role === "operator";
+  const grantable: Role[] = isSuper ? ["operator", "admin", "superuser"] : ["operator"];
   const [users, setUsers] = useState<UserRow[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -19,7 +25,7 @@ export default function Users() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"operator" | "admin">("operator");
+  const [role, setRole] = useState<Role>("operator");
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
@@ -58,9 +64,8 @@ export default function Users() {
       <form className="card row wrap" onSubmit={create}>
         <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <input type="password" placeholder="Initial password (12+)" minLength={12} value={password} onChange={(e) => setPassword(e.target.value)} required />
-        <select value={role} onChange={(e) => setRole(e.target.value as "operator" | "admin")}>
-          <option value="operator">Operator</option>
-          <option value="admin">Admin</option>
+        <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
+          {grantable.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
         </select>
         <button type="submit">Create user</button>
       </form>
@@ -83,19 +88,22 @@ export default function Users() {
             <tr key={u.id}>
               <td>{u.email}</td>
               <td>
-                <select value={u.role} disabled={u.id === me.id} onChange={(e) => patch(u, { role: e.target.value })}>
-                  <option value="operator">operator</option>
-                  <option value="admin">admin</option>
+                <select value={u.role} disabled={u.id === me.id || !canManage(u)}
+                  onChange={(e) => patch(u, { role: e.target.value })}>
+                  {[...new Set<Role>([u.role, ...grantable])].map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
                 </select>
               </td>
               <td>
                 <label className="inline">
-                  <input type="checkbox" checked={u.active} disabled={u.id === me.id} onChange={(e) => patch(u, { active: e.target.checked })} /> active
+                  <input type="checkbox" checked={u.active} disabled={u.id === me.id || !canManage(u)}
+                    onChange={(e) => patch(u, { active: e.target.checked })} /> active
                 </label>
               </td>
               <td>{u.totp_enabled ? <span className="ok-text">on</span> : <span className="muted">off</span>}</td>
               <td>
-                {u.role === "admin" ? (
+                {u.role !== "operator" ? (
                   <span className="muted">all</span>
                 ) : editing === u.id ? (
                   <AssignEditor user={u} devices={devices} onDone={() => (setEditing(null), load())} />
@@ -103,7 +111,7 @@ export default function Users() {
                   <button className="ghost" onClick={() => setEditing(u.id)}>{u.device_ids.length} assigned ✎</button>
                 )}
               </td>
-              <td>{u.totp_enabled && <button className="ghost" onClick={() => reset2fa(u)}>Turn off 2FA</button>}</td>
+              <td>{u.totp_enabled && canManage(u) && <button className="ghost" onClick={() => reset2fa(u)}>Turn off 2FA</button>}</td>
             </tr>
           ))}
         </tbody>

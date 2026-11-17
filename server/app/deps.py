@@ -26,15 +26,26 @@ async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> 
     return user
 
 
+# Roles, highest to lowest: a superuser has every admin power plus the right to manage
+# admin accounts; an admin manages operators; an operator only sees its assigned phones.
+ADMIN_ROLES = {"admin", "superuser"}
+
+
 async def require_admin(user: User = Depends(current_user)) -> User:
-    if user.role != "admin":
+    if user.role not in ADMIN_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin only")
     return user
 
 
+async def require_superuser(user: User = Depends(current_user)) -> User:
+    if user.role != "superuser":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Superuser only")
+    return user
+
+
 async def visible_device_ids(db: AsyncSession, user: User) -> set[uuid.UUID] | None:
-    """None means every device (admins)."""
-    if user.role == "admin":
+    """None means every device (admins and superusers)."""
+    if user.role in ADMIN_ROLES:
         return None
     rows = await db.scalars(select(Assignment.device_id).where(Assignment.user_id == user.id))
     return set(rows)
