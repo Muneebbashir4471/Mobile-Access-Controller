@@ -69,9 +69,17 @@ All wired together with **Docker Compose** + Caddy (`deploy/`).
 | Dashboard | React 18, TypeScript 5, Vite 5, react-router 6 |
 | Infra | Docker Compose, Caddy, PostgreSQL 16, Redis 7, coturn 4.6.3 |
 
+## Git / repository
+
+Code lives on GitHub at **`git@github.com:Muneebbashir4471/Mobile-Access-Controller.git`** (private),
+branch **`main`**. Commit and push work directly to `origin/main` here. Never commit secrets
+(`deploy/.env.lan`, `.env`, `releases/*.apk`, keystores) — they are gitignored. See `CLAUDE.md` →
+"Git / where to commit" for the full workflow.
+
 ## Where to look
 
 - Build / run / deploy / release / provisioning commands → **`CLAUDE.md`**
+- Git remote & commit workflow → **`CLAUDE.md`** → "Git / where to commit"
 - Android agent internals (capture modes, WebRTC, device owner) → **`AGENT.md`**
 - Per-phone setup checklist → `docs/phone-setup.md`
 - Ops runbook → `docs/runbook.md`

@@ -6,6 +6,20 @@ Three parts: a **Kotlin/WebRTC Android agent**, a **FastAPI + PostgreSQL + Redis
 and a **React/TypeScript dashboard**. See `PROJECT.md` for the overview and `AGENT.md` for the
 Android internals.
 
+## Git / where to commit (read this before committing)
+
+- **Remote (origin):** `git@github.com:Muneebbashir4471/Mobile-Access-Controller.git` (SSH).
+- **Default branch:** `main`, which tracks `origin/main`.
+- **Workflow:** the owner wants work committed to `main` and pushed directly here — `git push` (not
+  feature branches / PRs) unless asked otherwise. Any session or AI agent continuing this project
+  should commit and push to **this** repo.
+- **Before every push, run a secrets scan.** Never commit or push: `deploy/.env.lan`, `.env`,
+  anything under `releases/` (APKs), keystores, or real credentials — all are gitignored; keep it
+  that way. Only `*.env.example` templates belong in git.
+- Keep the GitHub repo **private** — this is a remote phone-control agent.
+- Commit-message attribution: use whatever `Co-Authored-By:` line the current session/harness
+  specifies; if none is given, omit it.
+
 ## Repository layout
 
 | Path | What it is |
