@@ -35,8 +35,9 @@ a rebrand of RustDesk/scrcpy/AnyDesk.
    cross-worker pub/sub bus; coturn for WebRTC TURN relay. Argon2 passwords; TOTP 2FA (required for admins and superusers).
 
 3. **Dashboard** (`dashboard/`) — React 18 + TypeScript + Vite. Left sidebar navigation (a top bar on phone-width screens). Pages: `Login`, `Phones` (fleet),
-   `Control` (live view + keyboard/paste input + stats), `Devices` (pairing, Device Owner setup QR, per-phone MT5 accounts), `Assignments`
-   via `Users`, `History`, `Settings` (2FA).
+   `Control` (live view + keyboard/paste input + stats), `Devices` (pairing, Device Owner setup QR,
+   video settings), `Settings` (2FA; for admins also user management and phone assignments). Session/audit
+   history and the MT5 account directory are still recorded/served by the API but have no dashboard page.
 
 All wired together with **Docker Compose** + Caddy (`deploy/`).
 

@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import Qr from "../components/Qr";
 import { ago } from "../format";
-import type { Account, Device } from "../types";
+import type { Device } from "../types";
 import { useDevices } from "../useDevices";
 
 interface PairingCode {
@@ -145,65 +145,6 @@ function DeviceEditor({ d }: { d: Device }) {
           <button type="button" className="danger" onClick={revoke}>Revoke</button>
         </div>
       </form>
-      <AccountsEditor deviceId={d.id} />
-    </div>
-  );
-}
-
-function AccountsEditor({ deviceId }: { deviceId: string }) {
-  const [rows, setRows] = useState<Account[]>([]);
-  const [login, setLogin] = useState("");
-  const [server, setServer] = useState("");
-  const [label, setLabel] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const load = () => api<Account[]>(`/api/devices/${deviceId}/accounts`).then(setRows);
-  useEffect(() => {
-    load();
-  }, [deviceId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const add = async (e: FormEvent) => {
-    e.preventDefault();
-    try {
-      await api(`/api/devices/${deviceId}/accounts`, { method: "POST", body: { login, broker_server: server, label: label || null } });
-      setLogin("");
-      setLabel("");
-      setError(null);
-      load();
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
-  const remove = async (a: Account) => {
-    if (!confirm(`Remove account ${a.login} from this phone's directory?`)) return;
-    await api(`/api/accounts/${a.id}`, { method: "DELETE" });
-    load();
-  };
-
-  return (
-    <div>
-      <h3>MT5 accounts on this phone</h3>
-      <p className="muted small">Directory only. MT5 passwords are never stored here.</p>
-      <table className="compact">
-        <tbody>
-          {rows.map((a) => (
-            <tr key={a.id}>
-              <td className="mono">{a.login}</td>
-              <td>{a.broker_server}</td>
-              <td>{a.label}</td>
-              <td><button className="ghost" onClick={() => remove(a)}>Remove</button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <form onSubmit={add} className="row">
-        <input placeholder="Login" value={login} onChange={(e) => setLogin(e.target.value)} required />
-        <input placeholder="Broker server" value={server} onChange={(e) => setServer(e.target.value)} required />
-        <input placeholder="Label (optional)" value={label} onChange={(e) => setLabel(e.target.value)} />
-        <button type="submit">Add</button>
-      </form>
-      {error && <p className="error">{error}</p>}
     </div>
   );
 }

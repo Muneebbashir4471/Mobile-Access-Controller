@@ -25,7 +25,7 @@
 ## Roles
 
 - **superuser**: everything, including creating, editing and disabling admins and superusers.
-- **admin**: all phones, pairing, devices, history; manages operators only.
+- **admin**: all phones, pairing, devices; manages operators only (Settings → Users).
 - **operator**: only the phones assigned to them.
 
 Admins and superusers must use two-factor login (`REQUIRE_ADMIN_2FA`, on by default). If the only

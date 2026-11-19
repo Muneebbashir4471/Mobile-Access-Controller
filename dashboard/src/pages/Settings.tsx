@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import Qr from "../components/Qr";
+import Users from "./Users";
 import type { Me } from "../types";
 
 export default function Settings() {
@@ -18,6 +19,7 @@ export default function Settings() {
         </p>
         {me.totp_enabled ? <Disable onDone={setMe} /> : <Enable onDone={setMe} />}
       </section>
+      {(me.role === "admin" || me.role === "superuser") && !me.must_enable_2fa && <Users />}
     </>
   );
 }

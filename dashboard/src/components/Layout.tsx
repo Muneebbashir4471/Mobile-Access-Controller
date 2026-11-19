@@ -31,8 +31,6 @@ export default function Layout() {
         <nav>
           <NavLink to="/" end>Phones</NavLink>
           {admin && <NavLink to="/devices">Devices</NavLink>}
-          {admin && <NavLink to="/users">Users</NavLink>}
-          {admin && <NavLink to="/history">History</NavLink>}
           <NavLink to="/settings">Settings{me.totp_enabled ? "" : " ⚠"}</NavLink>
         </nav>
         <div className="sidebar-foot">

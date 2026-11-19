@@ -59,7 +59,7 @@ export default function Users() {
 
   return (
     <>
-      <div className="toolbar"><h2>Users</h2></div>
+      <div className="toolbar users-head"><h2>Users</h2></div>
 
       <form className="card row wrap" onSubmit={create}>
         <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />

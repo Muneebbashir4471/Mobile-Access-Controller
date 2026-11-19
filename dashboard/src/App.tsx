@@ -6,11 +6,9 @@ import Layout from "./components/Layout";
 import { live } from "./live";
 import Control from "./pages/Control";
 import Devices from "./pages/Devices";
-import History from "./pages/History";
 import Login from "./pages/Login";
 import Phones from "./pages/Phones";
 import Settings from "./pages/Settings";
-import Users from "./pages/Users";
 import type { Me } from "./types";
 
 export default function App() {
@@ -47,8 +45,6 @@ export default function App() {
           <Route path="/" element={<Phones />} />
           <Route path="/settings" element={<Settings />} />
           {admin && <Route path="/devices" element={<Devices />} />}
-          {admin && <Route path="/users" element={<Users />} />}
-          {admin && <Route path="/history" element={<History />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
