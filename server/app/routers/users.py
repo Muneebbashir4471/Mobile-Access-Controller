@@ -19,9 +19,11 @@ class UserIn(BaseModel):
     email: str = Field(min_length=3, max_length=320, pattern=r"^[^@\s]+@[^@\s]+$")
     password: str = Field(min_length=12, max_length=200)
     role: str = Field(pattern="^(superuser|admin|operator)$")
+    name: str | None = Field(None, max_length=100)
 
 
 class UserPatch(BaseModel):
+    name: str | None = Field(None, max_length=100)
     role: str | None = Field(None, pattern="^(superuser|admin|operator)$")
     active: bool | None = None
     password: str | None = Field(None, min_length=12, max_length=200)
@@ -43,8 +45,9 @@ class AssignIn(BaseModel):
 
 async def _user_out(db: AsyncSession, u: User) -> dict:
     ids = await db.scalars(select(Assignment.device_id).where(Assignment.user_id == u.id))
-    return {"id": str(u.id), "email": u.email, "role": u.role, "active": u.active,
+    return {"id": str(u.id), "email": u.email, "name": u.name, "role": u.role, "active": u.active,
             "totp_enabled": u.totp_enabled, "created_at": u.created_at.isoformat() if u.created_at else None,
+            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
             "device_ids": [str(i) for i in ids]}
 
 
@@ -67,7 +70,8 @@ async def create_user(body: UserIn, admin: User = Depends(require_admin), db: As
     email = body.email.strip().lower()
     if await db.scalar(select(User).where(func.lower(User.email) == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already in use")
-    u = User(email=email, password_hash=hash_password(body.password), role=body.role, totp_enabled=False)
+    u = User(email=email, password_hash=hash_password(body.password), role=body.role, totp_enabled=False,
+             name=(body.name or "").strip() or None)
     db.add(u)
     audit(db, "user_created", admin.id, email, {"role": body.role})
     await db.commit()
@@ -88,6 +92,8 @@ async def update_user(user_id: uuid.UUID, body: UserPatch, admin: User = Depends
         u.role = body.role
     if body.active is not None:
         u.active = body.active
+    if "name" in changes:
+        u.name = (body.name or "").strip() or None
     if body.password is not None:
         u.password_hash = hash_password(body.password)
     audit(db, "user_updated", admin.id, u.email,

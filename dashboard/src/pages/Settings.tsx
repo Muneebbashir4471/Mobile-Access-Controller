@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import Qr from "../components/Qr";
-import { applyTheme, savedTheme, type Theme } from "../theme";
+import { ACCENTS, THEMES, applyTheme, savedAccent, savedTheme, type ThemeDef } from "../theme";
 import type { Me } from "../types";
 
 export default function Settings() {
@@ -115,24 +115,71 @@ function Disable({ onDone }: { onDone: (me: Me) => void }) {
   );
 }
 
-function ThemeCard() {
-  const [theme, setTheme] = useState<Theme>(savedTheme());
-  const pick = (t: Theme) => {
-    applyTheme(t);
-    setTheme(t);
-  };
-  const label: Record<Theme, string> = { system: "System", light: "Light", dark: "Dark" };
+function Preview({ t }: { t: ThemeDef }) {
   return (
-    <section className="card settings">
-      <h3>Theme</h3>
-      <div className="theme-pick">
-        {(["system", "light", "dark"] as Theme[]).map((t) => (
-          <button key={t} type="button" className={`ghost${theme === t ? " on" : ""}`} onClick={() => pick(t)}>
-            {label[t]}
+    <div className="tp-preview" style={{ background: t.bg }}>
+      <div className="tp-side" style={{ background: t.surface }}>
+        <i style={{ background: t.accent }} /><i style={{ background: t.border }} /><i style={{ background: t.border }} />
+      </div>
+      <div className="tp-main">
+        {[0, 1].map((n) => (
+          <div key={n} className="tp-card" style={{ background: t.surface2, borderColor: t.border }}>
+            <i style={{ background: t.muted, width: "70%" }} /><i style={{ background: n ? t.accent : t.border, width: "40%" }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ThemeCard() {
+  const [theme, setTheme] = useState(savedTheme());
+  const [accent, setAccent] = useState<string | null>(savedAccent());
+  const pickTheme = (id: string) => {
+    applyTheme(id, null); // a theme brings its own accent
+    setTheme(id);
+    setAccent(null);
+  };
+  const pickAccent = (a: string | null) => {
+    applyTheme(theme, a);
+    setAccent(a);
+  };
+  const current = accent ?? THEMES.find((x) => x.id === theme)?.accent ?? null;
+  const dark = THEMES[0];
+  const light = THEMES[1];
+
+  return (
+    <section className="card">
+      <h3>Appearance</h3>
+      <p className="muted small">App theme. Choosing a theme also sets its accent color, which you can change below. Saved in this browser.</p>
+      <div className="theme-grid">
+        <button type="button" className={`tp${theme === "system" ? " on" : ""}`} onClick={() => pickTheme("system")}>
+          <div className="tp-split"><Preview t={dark} /><Preview t={light} /></div>
+          <span>System</span>
+        </button>
+        {THEMES.map((t) => (
+          <button key={t.id} type="button" className={`tp${theme === t.id ? " on" : ""}`} onClick={() => pickTheme(t.id)}>
+            <Preview t={t} />
+            <span>{t.name}</span>
           </button>
         ))}
       </div>
-      <p className="muted small">Saved in this browser. System follows your computer's light/dark setting.</p>
+      <div className="accent-row">
+        <div>
+          <strong>Accent color</strong>
+          <div className="muted small">Buttons, highlights and selection</div>
+        </div>
+        <div className="swatches">
+          {ACCENTS.map((a) => (
+            <button key={a} type="button" title={a} className={`swatch${current === a ? " on" : ""}`}
+              style={{ background: a }} onClick={() => pickAccent(a)} />
+          ))}
+          <label className="swatch swatch-custom" title="Custom color">
+            <input type="color" value={current ?? "#3b82f6"} onChange={(e) => pickAccent(e.target.value)} />
+          </label>
+          {accent && <button type="button" className="ghost small" onClick={() => pickAccent(null)}>Reset</button>}
+        </div>
+      </div>
     </section>
   );
 }

@@ -65,10 +65,12 @@ export interface Account {
 export interface UserRow {
   id: string;
   email: string;
+  name: string | null;
   role: Role;
   active: boolean;
   totp_enabled: boolean;
   created_at: string | null;
+  last_login_at: string | null;
   device_ids: string[];
 }
 

@@ -42,9 +42,11 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     totp_secret: Mapped[str | None] = mapped_column(String(64))
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    role: Mapped[str] = mapped_column(String(16))  # "admin" | "operator"
+    role: Mapped[str] = mapped_column(String(16))  # "superuser" | "admin" | "operator"
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    name: Mapped[str | None] = mapped_column(String(100))
+    last_login_at: Mapped[datetime | None] = mapped_column(TS)
 
 
 class Device(Base):

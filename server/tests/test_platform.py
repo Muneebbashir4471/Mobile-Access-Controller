@@ -282,3 +282,14 @@ def test_change_own_password(client):
     assert ok.status_code == 200
     short = client.post("/api/auth/password", json={"current_password": "brand-new-password", "new_password": "short"})
     assert short.status_code == 422
+
+
+def test_user_name_and_last_sign_in(client):
+    _admin(client)
+    me = next(u for u in client.get("/api/users").json() if u["email"] == "admin@example.com")
+    assert me["last_login_at"] is not None
+    new = client.post("/api/users", json={"email": "op9@example.com", "password": PASSWORD,
+                                          "role": "operator", "name": "  Talha  "}).json()
+    assert new["name"] == "Talha" and new["last_login_at"] is None
+    renamed = client.patch(f"/api/users/{new['id']}", json={"name": "Talha Abbasi"}).json()
+    assert renamed["name"] == "Talha Abbasi"

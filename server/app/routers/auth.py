@@ -8,7 +8,7 @@ from ..auth_sessions import COOKIE_NAME, create_session, destroy_session
 from ..config import get_settings
 from ..db import get_db
 from ..deps import ADMIN_ROLES, client_ip, current_user, needs_2fa
-from ..models import User
+from ..models import User, utcnow
 from ..redis_state import get_redis, k_login_fail, rate_limit
 from ..security import DUMMY_PASSWORD_HASH, hash_password, new_totp_secret, totp_uri, verify_password, verify_totp
 
@@ -39,7 +39,7 @@ class PasswordIn(BaseModel):
 
 
 def user_out(u: User) -> dict:
-    return {"id": str(u.id), "email": u.email, "role": u.role, "active": u.active, "totp_enabled": u.totp_enabled,
+    return {"id": str(u.id), "email": u.email, "name": u.name, "role": u.role, "active": u.active, "totp_enabled": u.totp_enabled,
             "must_enable_2fa": needs_2fa(u)}
 
 
@@ -85,6 +85,7 @@ async def login(body: LoginIn, request: Request, response: Response, db: AsyncSe
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail)
 
     await r.delete(k_login_fail(email))
+    user.last_login_at = utcnow()  # saved with the login audit row below
     token = await create_session(user.id)
     response.set_cookie(
         COOKIE_NAME, token, httponly=True, secure=s.cookie_secure, samesite="strict",
