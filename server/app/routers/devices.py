@@ -11,7 +11,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import client_ip, current_user, require_admin, visible_device_ids
 from ..hub.bus import bus
-from ..hub.devices import broadcast_device, device_snapshot, effective_video
+from ..hub.devices import broadcast_device, device_snapshot
 from ..hub.sessions import end_device_session
 from ..models import Device, Mt5Account, PairingCode, User, aware, utcnow
 from ..redis_state import rate_limit
@@ -134,17 +134,10 @@ async def pair(body: PairIn, request: Request, db: AsyncSession = Depends(get_db
 
 # Device admin ----------------------------------------------------------------
 
-class VideoSettings(BaseModel):
-    width: int | None = Field(None, ge=240, le=1440)
-    fps: int | None = Field(None, ge=1, le=30)
-    bitrate: int | None = Field(None, ge=100_000, le=4_000_000)
-
-
 class DevicePatch(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
     notes: str | None = None
     sim_carrier: str | None = Field(None, max_length=100)
-    video_settings: VideoSettings | None = None
 
 
 @router.patch("/devices/{device_id}")
@@ -155,14 +148,8 @@ async def update_device(device_id: uuid.UUID, body: DevicePatch, admin: User = D
     for field in ("name", "notes", "sim_carrier"):
         if field in changes:
             setattr(d, field, changes[field])
-    if body.video_settings is not None:
-        d.video_settings = {**(d.video_settings or {}),
-                            **body.video_settings.model_dump(exclude_none=True)}
     audit(db, "device_updated", admin.id, str(d.id), changes)
     await db.commit()
-    if body.video_settings is not None:
-        await bus.to_agent(str(d.id), {"type": "config", "video": effective_video(d),
-                                       "heartbeat_seconds": get_settings().heartbeat_seconds})
     await broadcast_device(d)
     return await device_snapshot(d)
 

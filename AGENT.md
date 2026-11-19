@@ -66,7 +66,7 @@ adapts resolution/fps at the source via `adaptOutputFormat` so the virtual displ
    applies encoding limits, and returns an **answer** (`rtc_answer`).
 4. ICE candidates exchanged via the hub. `IceTransportsType.ALL` — direct on LAN/open NAT, TURN relay
    otherwise (phones on SIM behind carrier NAT usually relay).
-5. Encoding limits (`applyVideoLimits`): `maxBitrate` from settings (default 3 Mbps), `minBitrate`
+5. Encoding limits (`applyVideoLimits`): `maxBitrate` from the server's `default_video` (3 Mbps), `minBitrate`
    floor `min(500k, max)` so the encoder doesn't starve while bandwidth is probed, `maxFramerate` from
    fps, `DegradationPreference.BALANCED`.
 6. **Input** arrives on a WebRTC data channel the browser opens ("input"), with a WebSocket fallback

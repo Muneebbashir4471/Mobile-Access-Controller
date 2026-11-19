@@ -106,9 +106,6 @@ function DeviceEditor({ d }: { d: Device }) {
   const [name, setName] = useState(d.name);
   const [carrier, setCarrier] = useState(d.sim_carrier ?? "");
   const [notes, setNotes] = useState(d.notes ?? "");
-  const [fps, setFps] = useState(d.video_settings.fps);
-  const [kbps, setKbps] = useState(Math.round(d.video_settings.bitrate / 1000));
-  const [width, setWidth] = useState(d.video_settings.width);
   const [msg, setMsg] = useState<string | null>(null);
 
   const save = async (e: FormEvent) => {
@@ -116,7 +113,7 @@ function DeviceEditor({ d }: { d: Device }) {
     try {
       await api(`/api/devices/${d.id}`, {
         method: "PATCH",
-        body: { name, sim_carrier: carrier || null, notes: notes || null, video_settings: { fps, bitrate: kbps * 1000, width } },
+        body: { name, sim_carrier: carrier || null, notes: notes || null },
       });
       setMsg("Saved");
     } catch (err: any) {
@@ -135,9 +132,6 @@ function DeviceEditor({ d }: { d: Device }) {
         <label>Name<input value={name} onChange={(e) => setName(e.target.value)} required /></label>
         <label>SIM carrier<input value={carrier} onChange={(e) => setCarrier(e.target.value)} /></label>
         <label className="wide">Notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></label>
-        <label>Frames per second<input type="number" min={1} max={30} value={fps} onChange={(e) => setFps(+e.target.value)} /></label>
-        <label>Bitrate cap (kbps)<input type="number" min={100} max={4000} step={50} value={kbps} onChange={(e) => setKbps(+e.target.value)} /></label>
-        <label>Short side (px)<input type="number" min={240} max={1440} step={8} value={width} onChange={(e) => setWidth(+e.target.value)} /></label>
         <div className="row wide">
           <button type="submit">Save</button>
           {msg && <span className="muted small">{msg}</span>}

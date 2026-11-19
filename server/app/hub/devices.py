@@ -7,7 +7,8 @@ from .bus import bus
 
 
 def effective_video(device: Device) -> dict:
-    return {**get_settings().default_video, **(device.video_settings or {})}
+    # One server-wide setting (MT5_DEFAULT_VIDEO); old per-phone values in devices.video_settings are ignored.
+    return dict(get_settings().default_video)
 
 
 def device_view(device: Device, online: bool, active: dict | None) -> dict:
