@@ -51,16 +51,19 @@ async def _user_out(db: AsyncSession, u: User) -> dict:
             "device_ids": [str(i) for i in ids]}
 
 
-async def _get_user(db: AsyncSession, user_id: uuid.UUID) -> User:
+async def _get_user(db: AsyncSession, user_id: uuid.UUID, caller: User) -> User:
     u = await db.get(User, user_id)
-    if u is None:
+    if u is None or (u.role == "superuser" and caller.role != "superuser"):  # hidden, not just forbidden
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such user")
     return u
 
 
 @router.get("")
 async def list_users(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    users = (await db.scalars(select(User).order_by(User.email))).all()
+    q = select(User).order_by(User.email)
+    if admin.role != "superuser":
+        q = q.where(User.role != "superuser")  # superusers are invisible to admins
+    users = (await db.scalars(q)).all()
     return [await _user_out(db, u) for u in users]
 
 
@@ -81,7 +84,7 @@ async def create_user(body: UserIn, admin: User = Depends(require_admin), db: As
 @router.patch("/{user_id}")
 async def update_user(user_id: uuid.UUID, body: UserPatch, admin: User = Depends(require_admin),
                       db: AsyncSession = Depends(get_db)):
-    u = await _get_user(db, user_id)
+    u = await _get_user(db, user_id, admin)
     _can_manage(admin, u.role)  # an admin cannot touch a superuser
     if body.role is not None:
         _can_manage(admin, body.role)  # nor grant the superuser role
@@ -106,7 +109,7 @@ async def update_user(user_id: uuid.UUID, body: UserPatch, admin: User = Depends
 @router.post("/{user_id}/reset-2fa")
 async def reset_2fa(user_id: uuid.UUID, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     """For a user who lost their authenticator: turns 2FA off so they can set it up again."""
-    u = await _get_user(db, user_id)
+    u = await _get_user(db, user_id, admin)
     _can_manage(admin, u.role)  # an admin cannot reset a superuser's 2FA
     u.totp_secret = None
     u.totp_enabled = False
@@ -118,7 +121,7 @@ async def reset_2fa(user_id: uuid.UUID, admin: User = Depends(require_admin), db
 @router.put("/{user_id}/devices")
 async def set_assignments(user_id: uuid.UUID, body: AssignIn, admin: User = Depends(require_admin),
                           db: AsyncSession = Depends(get_db)):
-    u = await _get_user(db, user_id)
+    u = await _get_user(db, user_id, admin)
     if u.role != "operator":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Admins and superusers already see every phone")
     wanted = set(body.device_ids)

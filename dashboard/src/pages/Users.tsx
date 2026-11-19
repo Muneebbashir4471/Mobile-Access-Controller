@@ -134,8 +134,9 @@ export default function Users() {
 
       <div className="card users-card">
         <p className="muted small">
-          Admins and superusers see every phone. Operators only see the phones assigned to them. Admins manage
-          operators and other admins; only a superuser manages superusers.
+          {isSuper
+            ? "Superusers see everything and are hidden from admins and operators (shown to them only as \"Administrator\"). Admins see every phone and manage operators and other admins."
+            : "Admins see every phone. Operators only see the phones assigned to them."}
         </p>
         <table className="users">
           <thead>

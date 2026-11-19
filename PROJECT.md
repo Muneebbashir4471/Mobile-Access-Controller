@@ -56,7 +56,7 @@ All wired together with **Docker Compose** + Caddy (`deploy/`).
 ## Status
 
 - Server + dashboard: implemented and tested (`pytest` 14 passing; load test 30 phones/10 operators).
-  Roles: superuser > admin > operator. Admins manage operators and other admins (not superusers)
+  Roles: superuser > admin > operator. Admins manage operators and other admins (superusers are hidden from them)
   and see every phone; passwords (incl. their own) are set on the Users page.
   Settings also has 22 app themes + accent colours (`dashboard/src/theme.ts`, per browser). Users
   carry an optional `name` and `last_login_at` (migration 0003).

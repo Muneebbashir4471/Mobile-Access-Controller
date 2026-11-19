@@ -11,7 +11,7 @@ from ..audit import audit
 from ..auth_sessions import COOKIE_NAME, resolve_session
 from ..config import get_settings
 from ..db import session_factory
-from ..deps import load_active_user, visible_device_ids
+from ..deps import ADMIN_ROLES, load_active_user, visible_device_ids
 from ..models import Device, User
 from ..redis_state import get_redis, k_active_session
 from .bus import bus
@@ -29,7 +29,8 @@ class OperatorConn:
         self.ws = ws
         self.user_id = str(user.id)
         self.email = user.email
-        self.is_admin = user.role == "admin"
+        self.label = user.public_label  # what other users see
+        self.is_admin = user.role in ADMIN_ROLES
         self.visible = {str(v) for v in visible} if visible is not None else None
         self.token = token
         self.conn_id = uuid.uuid4().hex
@@ -155,10 +156,10 @@ async def _handle(conn: OperatorConn, msg: dict) -> dict | None:
         did = str(device.id)
         active = await get_redis().hgetall(k_active_session(did))
         if active and active["user_id"] != conn.user_id:
-            await end_session(active["session_id"], "takeover", by=conn.email)
+            await end_session(active["session_id"], "takeover", by=conn.label)
             async with session_factory()() as db:
                 audit(db, "takeover", uuid.UUID(conn.user_id), did,
-                      {"displaced_user": active.get("user_email"), "session_id": active["session_id"]})
+                      {"displaced_user_id": active.get("user_id"), "session_id": active["session_id"]})
                 await db.commit()
         return await _open(conn, did)
 

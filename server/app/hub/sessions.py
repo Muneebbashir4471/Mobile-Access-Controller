@@ -19,7 +19,7 @@ from .devices import effective_video
 
 
 def _lock_view(sid: str, user: User, started_at: str) -> dict:
-    return {"session_id": sid, "user_id": str(user.id), "user_email": user.email, "started_at": started_at}
+    return {"session_id": sid, "user_id": str(user.id), "user_email": user.public_label, "started_at": started_at}
 
 
 async def open_session(db: AsyncSession, user: User, device: Device, conn_id: str) -> dict:
@@ -57,7 +57,7 @@ async def open_session(db: AsyncSession, user: User, device: Device, conn_id: st
     await r.hset(k_session(sid), mapping={"device_id": did, "user_id": uid, "conn_id": conn_id})
     await r.hset(
         k_active_session(did),
-        mapping={"session_id": sid, "user_id": uid, "user_email": user.email, "started_at": started},
+        mapping={"session_id": sid, "user_id": uid, "user_email": user.public_label, "started_at": started},
     )
 
     await bus.to_agent(

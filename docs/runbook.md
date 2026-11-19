@@ -24,7 +24,9 @@
 
 ## Roles
 
-- **superuser**: everything, including creating, editing and disabling superusers.
+- **superuser**: everything, including creating, editing and disabling superusers. **Hidden** from
+  admins and operators: not on their Users page or in history, and shown to them only as
+  "Administrator" when using or taking over a phone.
 - **admin**: all phones (automatically), pairing, devices; creates and manages operators and other
   admins, including setting their passwords (Users page). Cannot touch superusers.
 - **operator**: only the phones assigned to them.

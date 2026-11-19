@@ -33,6 +33,8 @@ async def list_sessions(
         .order_by(ControlSession.started_at.desc())
         .limit(limit)
     )
+    if admin.role != "superuser":
+        q = q.where(User.role != "superuser")
     if device_id:
         q = q.where(ControlSession.device_id == device_id)
     if user_id:
@@ -64,6 +66,8 @@ async def list_audit(
         .order_by(AuditLog.id.desc())
         .limit(limit)
     )
+    if admin.role != "superuser":
+        q = q.where((User.role.is_(None)) | (User.role != "superuser"))
     if action:
         q = q.where(AuditLog.action == action)
     if user_id:

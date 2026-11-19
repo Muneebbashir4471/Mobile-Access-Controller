@@ -255,9 +255,12 @@ def test_superuser_outranks_admin(client):
     assert client.patch(f"/api/users/{a2.json()['id']}", json={"role": "superuser"}).status_code == 403
     assert client.post("/api/users", json={**new, "email": "op2@example.com", "role": "operator"}).status_code == 201
     sid, ssecret = add_user(client, "owner@example.com", "superuser")
-    assert client.patch(f"/api/users/{sid}", json={"active": False}).status_code == 403
+    # Superusers are invisible to admins: not listed, and acting on one looks like a missing user.
+    assert all(u["role"] != "superuser" for u in client.get("/api/users").json())
+    assert client.patch(f"/api/users/{sid}", json={"active": False}).status_code == 404
     client.post("/api/auth/logout")
     login(client, "owner@example.com", ssecret)
+    assert any(u["role"] == "superuser" for u in client.get("/api/users").json())  # superusers see everyone
     assert client.patch(f"/api/users/{admin_id}", json={"role": "operator"}).status_code == 200
     assert client.post("/api/users", json={**new, "email": "a3@example.com", "role": "admin"}).status_code == 201
 
@@ -283,3 +286,26 @@ def test_user_name_and_last_sign_in(client):
     assert new["name"] == "Talha" and new["last_login_at"] is None
     renamed = client.patch(f"/api/users/{new['id']}", json={"name": "Talha Abbasi"}).json()
     assert renamed["name"] == "Talha Abbasi"
+
+
+def test_superuser_is_anonymous_on_shared_screens(client):
+    _admin(client)
+    from fastapi.testclient import TestClient
+
+    _, ssecret = add_user(client, "owner@example.com", "superuser")
+    su = TestClient(client.app, base_url="https://testserver")
+    su.portal = client.portal
+    login(su, "owner@example.com", ssecret)
+    code = client.post("/api/devices/pairing-codes").json()["code"]
+    dev_token = client.post("/api/devices/pair", json={"code": code, "model": "Pixel"}).json()
+    with _agent(client, dev_token["token"]) as agent:
+        agent.receive_json()  # config
+        agent.send_json(STATUS)
+        time.sleep(0.1)
+        with su.websocket_connect("/ws/operator") as sws:
+            sws.send_json({"type": "open", "device_id": dev_token["device_id"]})
+            _recv_until(sws, "opened")
+            with client.websocket_connect("/ws/operator") as aws:  # the admin
+                aws.send_json({"type": "open", "device_id": dev_token["device_id"]})
+                denied = _recv_until(aws, "denied")
+                assert denied["held_by"] == "Administrator"

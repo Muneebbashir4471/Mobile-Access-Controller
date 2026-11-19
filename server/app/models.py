@@ -48,6 +48,12 @@ class User(Base):
     name: Mapped[str | None] = mapped_column(String(100))
     last_login_at: Mapped[datetime | None] = mapped_column(TS)
 
+    @property
+    def public_label(self) -> str:
+        """How this user appears to others on shared screens (phone "in use by", takeovers).
+        Superusers stay anonymous: admins and operators cannot see them."""
+        return "Administrator" if self.role == "superuser" else self.email
+
 
 class Device(Base):
     __tablename__ = "devices"

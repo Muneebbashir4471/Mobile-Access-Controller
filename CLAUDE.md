@@ -67,7 +67,8 @@ Security group: TCP 80/443, UDP+TCP 3478, UDP 49160–49200. Full steps: `docs/r
 
 Auth is **session-cookie based** (login returns the user JSON + sets a cookie; there is no bearer
 token). Roles: **superuser** > **admin** > **operator**. Admins create/manage operators and other
-admins (incl. passwords) but never superusers; admins see all phones automatically. Admins and superusers **must** turn on
+admins (incl. passwords) but never superusers; admins see all phones automatically. Superusers are
+hidden from everyone else (`User.public_label` → "Administrator"; filtered from users/history APIs). Admins and superusers **must** turn on
 TOTP 2FA (Settings) before admin features unlock and phones show (`REQUIRE_ADMIN_2FA`, default
 true; set false only to recover access). Operators' 2FA is optional.
 
