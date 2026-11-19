@@ -56,7 +56,8 @@ All wired together with **Docker Compose** + Caddy (`deploy/`).
 ## Status
 
 - Server + dashboard: implemented and tested (`pytest` 14 passing; load test 30 phones/10 operators).
-  Roles: superuser > admin > operator.
+  Roles: superuser > admin > operator. Admins manage operators and other admins (not superusers)
+  and see every phone; anyone changes their own password in Settings (`POST /api/auth/password`).
 - Android agent: implemented (capture/input/device-owner QR setup/wake-unlock-lock/self-healing
   capture); latest release **0.6.1** (versionCode 15).
 - Production: Docker Compose on EC2, dashboard on an HTTPS domain, TURN on the public IP

@@ -24,9 +24,11 @@
 
 ## Roles
 
-- **superuser**: everything, including creating, editing and disabling admins and superusers.
-- **admin**: all phones, pairing, devices; manages operators only (Users page).
+- **superuser**: everything, including creating, editing and disabling superusers.
+- **admin**: all phones (automatically), pairing, devices; creates and manages operators and other
+  admins, including setting their passwords (Users page). Cannot touch superusers.
 - **operator**: only the phones assigned to them.
+- Everyone can change their own password and pick a light/dark theme under Settings.
 
 Admins and superusers must use two-factor login (`REQUIRE_ADMIN_2FA`, on by default). If the only
 superuser loses their authenticator, set `REQUIRE_ADMIN_2FA=false` in `.env`, restart the api,

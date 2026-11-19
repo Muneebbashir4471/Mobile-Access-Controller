@@ -247,8 +247,12 @@ def test_admin_must_turn_on_2fa(client):
 def test_superuser_outranks_admin(client):
     admin_id = _admin(client)
     new = {"password": PASSWORD}
-    assert client.post("/api/users", json={**new, "email": "a2@example.com", "role": "admin"}).status_code == 403
+    # An admin may create and manage other admins, but never superusers.
+    a2 = client.post("/api/users", json={**new, "email": "a2@example.com", "role": "admin"})
+    assert a2.status_code == 201
+    assert client.patch(f"/api/users/{a2.json()['id']}", json={"password": "another-long-pass"}).status_code == 200
     assert client.post("/api/users", json={**new, "email": "s2@example.com", "role": "superuser"}).status_code == 403
+    assert client.patch(f"/api/users/{a2.json()['id']}", json={"role": "superuser"}).status_code == 403
     assert client.post("/api/users", json={**new, "email": "op2@example.com", "role": "operator"}).status_code == 201
     sid, ssecret = add_user(client, "owner@example.com", "superuser")
     assert client.patch(f"/api/users/{sid}", json={"active": False}).status_code == 403
@@ -268,3 +272,13 @@ def test_fallback_alert_after_grace_period(client, monkeypatch):
         agent.send_json({**STATUS, "capture_mode": "fallback"})
         alert = _recv_until(op, "alert", limit=50)
         assert alert["kind"] == "fallback" and "1 fps" in alert["message"]
+
+
+def test_change_own_password(client):
+    _admin(client)
+    bad = client.post("/api/auth/password", json={"current_password": "wrong", "new_password": "x" * 12})
+    assert bad.status_code == 400
+    ok = client.post("/api/auth/password", json={"current_password": PASSWORD, "new_password": "brand-new-password"})
+    assert ok.status_code == 200
+    short = client.post("/api/auth/password", json={"current_password": "brand-new-password", "new_password": "short"})
+    assert short.status_code == 422

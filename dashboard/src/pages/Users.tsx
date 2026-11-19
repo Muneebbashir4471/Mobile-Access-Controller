@@ -8,9 +8,9 @@ const ROLE_LABEL: Record<Role, string> = { operator: "Operator", admin: "Admin",
 export default function Users() {
   const { me } = useAuth();
   const isSuper = me.role === "superuser";
-  // A superuser manages everyone; an admin may only touch operators.
-  const canManage = (u: UserRow) => isSuper || u.role === "operator";
-  const grantable: Role[] = isSuper ? ["operator", "admin", "superuser"] : ["operator"];
+  // A superuser manages everyone; an admin manages operators and other admins, not superusers.
+  const canManage = (u: UserRow) => isSuper || u.role !== "superuser";
+  const grantable: Role[] = isSuper ? ["operator", "admin", "superuser"] : ["operator", "admin"];
   const [users, setUsers] = useState<UserRow[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -45,6 +45,22 @@ export default function Users() {
     try {
       await api(`/api/users/${u.id}`, { method: "PATCH", body });
       load();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const changePassword = async (u: UserRow) => {
+    const pw = prompt(`New password for ${u.email} (12+ characters):`);
+    if (pw === null) return;
+    if (pw.length < 12) {
+      setError("Passwords must be at least 12 characters.");
+      return;
+    }
+    try {
+      await api(`/api/users/${u.id}`, { method: "PATCH", body: { password: pw } });
+      setError(null);
+      setNotice(`Password changed for ${u.email}.`);
     } catch (err: any) {
       setError(err.message);
     }
@@ -111,7 +127,10 @@ export default function Users() {
                   <button className="ghost" onClick={() => setEditing(u.id)}>{u.device_ids.length} assigned ✎</button>
                 )}
               </td>
-              <td>{u.totp_enabled && canManage(u) && <button className="ghost" onClick={() => reset2fa(u)}>Turn off 2FA</button>}</td>
+              <td className="row">
+                {canManage(u) && <button className="ghost" onClick={() => changePassword(u)}>Set password</button>}
+                {u.totp_enabled && canManage(u) && u.id !== me.id && <button className="ghost" onClick={() => reset2fa(u)}>Turn off 2FA</button>}
+              </td>
             </tr>
           ))}
         </tbody>

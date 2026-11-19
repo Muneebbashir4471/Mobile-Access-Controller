@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..audit import audit
 from ..db import get_db
-from ..deps import ADMIN_ROLES, require_admin
+from ..deps import require_admin
 from ..hub.bus import bus
 from ..models import Assignment, Device, User
 from ..security import hash_password
@@ -28,12 +28,13 @@ class UserPatch(BaseModel):
 
 
 def _can_manage(caller: User, target_role: str) -> None:
-    """A superuser may manage any account and grant any role; an admin may only touch
-    operators. Raises 403 otherwise. `target_role` is the role being acted on or granted."""
+    """A superuser may manage any account and grant any role; an admin may manage operators and
+    other admins (create, set password, disable) but never superusers. Raises 403 otherwise.
+    `target_role` is the role being acted on or granted. Admins see every phone automatically."""
     if caller.role == "superuser":
         return
-    if target_role in ADMIN_ROLES:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a superuser can manage admin accounts")
+    if target_role == "superuser":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a superuser can manage superuser accounts")
 
 
 class AssignIn(BaseModel):
@@ -62,7 +63,7 @@ async def list_users(admin: User = Depends(require_admin), db: AsyncSession = De
 
 @router.post("", status_code=201)
 async def create_user(body: UserIn, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    _can_manage(admin, body.role)  # only a superuser may create admin/superuser accounts
+    _can_manage(admin, body.role)  # only a superuser may create superuser accounts
     email = body.email.strip().lower()
     if await db.scalar(select(User).where(func.lower(User.email) == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already in use")
@@ -77,9 +78,9 @@ async def create_user(body: UserIn, admin: User = Depends(require_admin), db: As
 async def update_user(user_id: uuid.UUID, body: UserPatch, admin: User = Depends(require_admin),
                       db: AsyncSession = Depends(get_db)):
     u = await _get_user(db, user_id)
-    _can_manage(admin, u.role)  # an admin cannot touch another admin/superuser
+    _can_manage(admin, u.role)  # an admin cannot touch a superuser
     if body.role is not None:
-        _can_manage(admin, body.role)  # nor grant an admin/superuser role
+        _can_manage(admin, body.role)  # nor grant the superuser role
     if u.id == admin.id and (body.active is False or (body.role is not None and body.role != u.role)):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "You cannot change your own role or disable yourself")
     changes = body.model_dump(exclude_unset=True)
@@ -100,7 +101,7 @@ async def update_user(user_id: uuid.UUID, body: UserPatch, admin: User = Depends
 async def reset_2fa(user_id: uuid.UUID, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     """For a user who lost their authenticator: turns 2FA off so they can set it up again."""
     u = await _get_user(db, user_id)
-    _can_manage(admin, u.role)  # an admin cannot reset an admin/superuser's 2FA
+    _can_manage(admin, u.role)  # an admin cannot reset a superuser's 2FA
     u.totp_secret = None
     u.totp_enabled = False
     audit(db, "user_2fa_reset", admin.id, u.email)

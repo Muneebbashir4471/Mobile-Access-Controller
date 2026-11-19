@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +10,7 @@ from ..db import get_db
 from ..deps import ADMIN_ROLES, client_ip, current_user, needs_2fa
 from ..models import User
 from ..redis_state import get_redis, k_login_fail, rate_limit
-from ..security import DUMMY_PASSWORD_HASH, new_totp_secret, totp_uri, verify_password, verify_totp
+from ..security import DUMMY_PASSWORD_HASH, hash_password, new_totp_secret, totp_uri, verify_password, verify_totp
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -31,6 +31,11 @@ class CodeIn(BaseModel):
 class DisableIn(BaseModel):
     password: str
     code: str
+
+
+class PasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=12, max_length=200)
 
 
 def user_out(u: User) -> dict:
@@ -150,3 +155,15 @@ async def disable_2fa(body: DisableIn, user: User = Depends(current_user), db: A
     audit(db, "2fa_disabled", user.id, user.email)
     await db.commit()
     return user_out(user)
+
+
+@router.post("/password")
+async def change_password(body: PasswordIn, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+    """Any signed-in user changes their own password (the current one is required)."""
+    if not verify_password(user.password_hash, body.current_password):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is wrong")
+    u = await db.get(User, user.id)
+    u.password_hash = hash_password(body.new_password)
+    audit(db, "password_changed", u.id, u.email)
+    await db.commit()
+    return {"ok": True}
