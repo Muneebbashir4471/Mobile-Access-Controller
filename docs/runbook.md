@@ -33,6 +33,22 @@
 - Passwords are set on the Users page (key icon), including your own; operators ask an admin.
   Everyone picks a theme + accent color under Settings (saved per browser). Users have an optional display name; the Users page shows each user's last sign-in.
 
+### Superuser accounts
+
+Create one either way (the account is hidden from admins and operators from the start):
+- **Server command line** (first account, or no superuser can sign in):
+  `cd deploy && docker compose -f docker-compose.yml --env-file .env exec api python -m app.cli create-superuser you@example.com`
+  It asks for the password twice (12+ characters).
+- **Dashboard**, by an existing superuser: Users → create form → role **Superuser**. Admins do not
+  have this option.
+
+Then sign in with it and turn on two-factor login under Settings; until then phones and admin pages
+stay locked for it. Promoting an existing user to Superuser also hides them from admins.
+
+Lost password: another superuser resets it with the key icon on the Users page, or on the server:
+`docker compose -f docker-compose.yml --env-file .env exec api python -m app.cli set-password you@example.com`
+(works for any account).
+
 Admins and superusers must use two-factor login (`REQUIRE_ADMIN_2FA`, on by default). If the only
 superuser loses their authenticator, set `REQUIRE_ADMIN_2FA=false` in `.env`, restart the api,
 sign in, fix the account, and set it back to `true`.

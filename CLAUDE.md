@@ -76,6 +76,7 @@ true; set false only to recover access). Operators' 2FA is optional.
 cd deploy
 docker compose -f docker-compose.lan.yml --env-file .env.lan exec api \
   python -m app.cli create-superuser owner@mt5.local     # or create-admin
+# forgotten password (any account): python -m app.cli set-password owner@mt5.local
 ```
 
 Credentials are secrets — never commit them. The working admin login is held outside the repo.
