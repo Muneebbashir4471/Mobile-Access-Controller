@@ -26,7 +26,7 @@ export default function Layout() {
   const admin = me.role === "admin" || me.role === "superuser";
   return (
     <div className="app">
-      <header className="topbar">
+      <aside className="sidebar">
         <span className="brand">MT5 Phones</span>
         <nav>
           <NavLink to="/" end>Phones</NavLink>
@@ -35,11 +35,15 @@ export default function Layout() {
           {admin && <NavLink to="/history">History</NavLink>}
           <NavLink to="/settings">Settings{me.totp_enabled ? "" : " ⚠"}</NavLink>
         </nav>
-        <span className="spacer" />
-        <span className={`dot ${connected ? "ok" : "bad"}`} title={connected ? "Live" : "Reconnecting"} />
-        <span className="muted small">{me.email}</span>
-        <button className="ghost" onClick={signOut}>Sign out</button>
-      </header>
+        <div className="sidebar-foot">
+          <span className="who">
+            <span className={`dot ${connected ? "ok" : "bad"}`} title={connected ? "Live" : "Reconnecting"} />
+            <span className="muted small" title={me.email}>{me.email}</span>
+          </span>
+          <button className="ghost" onClick={signOut}>Sign out</button>
+        </div>
+      </aside>
+      <div className="content">
       {me.must_enable_2fa && (
         <div className="alerts">
           <div className="alert">
@@ -61,6 +65,7 @@ export default function Layout() {
       <main>
         <Outlet />
       </main>
+      </div>
     </div>
   );
 }

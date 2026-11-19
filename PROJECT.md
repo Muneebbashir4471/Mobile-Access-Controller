@@ -34,7 +34,7 @@ a rebrand of RustDesk/scrcpy/AnyDesk.
    devices/users/accounts/assignments/audit; Redis for presence, device locks, auth sessions, and a
    cross-worker pub/sub bus; coturn for WebRTC TURN relay. Argon2 passwords; TOTP 2FA (required for admins and superusers).
 
-3. **Dashboard** (`dashboard/`) — React 18 + TypeScript + Vite. Pages: `Login`, `Phones` (fleet),
+3. **Dashboard** (`dashboard/`) — React 18 + TypeScript + Vite. Left sidebar navigation (a top bar on phone-width screens). Pages: `Login`, `Phones` (fleet),
    `Control` (live view + keyboard/paste input + stats), `Devices` (pairing, Device Owner setup QR, per-phone MT5 accounts), `Assignments`
    via `Users`, `History`, `Settings` (2FA).
 
