@@ -8,6 +8,7 @@ import Control from "./pages/Control";
 import Devices from "./pages/Devices";
 import Login from "./pages/Login";
 import Phones from "./pages/Phones";
+import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import type { Me } from "./types";
 
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/" element={<Phones />} />
           <Route path="/settings" element={<Settings />} />
           {admin && <Route path="/devices" element={<Devices />} />}
+          {admin && <Route path="/users" element={<Users />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

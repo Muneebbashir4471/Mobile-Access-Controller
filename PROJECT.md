@@ -36,7 +36,7 @@ a rebrand of RustDesk/scrcpy/AnyDesk.
 
 3. **Dashboard** (`dashboard/`) — React 18 + TypeScript + Vite. Left sidebar navigation (a top bar on phone-width screens). Pages: `Login`, `Phones` (fleet),
    `Control` (live view + keyboard/paste input + stats), `Devices` (pairing, Device Owner setup QR,
-   rename/notes/revoke), `Settings` (2FA; for admins also user management and phone assignments). Session/audit
+   rename/notes/revoke), `Users` (admins: accounts, roles, phone assignments), `Settings` (2FA). Session/audit
    history and the MT5 account directory are still recorded/served by the API but have no dashboard page. Video quality (width/fps/bitrate) is one
    server-wide setting, `default_video` in `server/app/config.py` (env `MT5_DEFAULT_VIDEO`, JSON).
 
