@@ -61,13 +61,12 @@ On 3 phones provisioned with `deploy/provision-phone.sh`:
 
 ## Milestone 5: dashboard
 
-- An operator finds an account by login on the Accounts page, opens its phone and trades using
-  only the dashboard.
+- An operator opens a phone from the Phones page and trades using only the dashboard.
 
 ## Milestone 6: hardening and rollout
 
 - `server/loadtest/simulate.py` against production with `--phones 30 --operators 10`: no errors,
   open → opened p95 under 500 ms. (Local result on a laptop: p95 129 ms, 0 errors.)
-- Publish a new agent APK on the Devices page: phones update themselves (device owner = silent)
-  and come back online on the new version.
+- Install a new agent APK over the old one on a phone: it keeps its pairing and comes back online
+  on the new version.
 - Provision all 30 phones; leave them **7 days** untouched. Pass = every phone reachable every day.

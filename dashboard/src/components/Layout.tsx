@@ -30,7 +30,6 @@ export default function Layout() {
         <span className="brand">MT5 Phones</span>
         <nav>
           <NavLink to="/" end>Phones</NavLink>
-          <NavLink to="/accounts">Accounts</NavLink>
           {admin && <NavLink to="/devices">Devices</NavLink>}
           {admin && <NavLink to="/users">Users</NavLink>}
           {admin && <NavLink to="/history">History</NavLink>}

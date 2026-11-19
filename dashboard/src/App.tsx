@@ -4,7 +4,6 @@ import { api, onUnauthorized } from "./api";
 import { AuthContext } from "./auth";
 import Layout from "./components/Layout";
 import { live } from "./live";
-import Accounts from "./pages/Accounts";
 import Control from "./pages/Control";
 import Devices from "./pages/Devices";
 import History from "./pages/History";
@@ -46,7 +45,6 @@ export default function App() {
         <Route path="/control/:deviceId" element={<Control />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Phones />} />
-          <Route path="/accounts" element={<Accounts />} />
           <Route path="/settings" element={<Settings />} />
           {admin && <Route path="/devices" element={<Devices />} />}
           {admin && <Route path="/users" element={<Users />} />}

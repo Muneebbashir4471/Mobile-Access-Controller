@@ -11,7 +11,8 @@ Android internals.
 - **Remote (origin):** `git@github.com:Muneebbashir4471/Mobile-Access-Controller.git` (SSH).
 - **Default branch:** `main`, which tracks `origin/main`.
 - **Workflow:** the owner wants work committed to `main` and pushed directly here — `git push` (not
-  feature branches / PRs) unless asked otherwise. Any session or AI agent continuing this project
+  feature branches / PRs) unless asked otherwise. **After every change, without being asked:** update
+  `CLAUDE.md`, `PROJECT.md` and `AGENT.md` (and `docs/` where relevant) to match, then commit and push. Any session or AI agent continuing this project
   should commit and push to **this** repo.
 - **Before every push, run a secrets scan.** Never commit or push: `deploy/.env.lan`, `.env`,
   anything under `releases/` (APKs), keystores, or real credentials — all are gitignored; keep it
@@ -131,8 +132,10 @@ To ship a new version: bump the version, `./build-apk.sh`, and give the client t
   → phone opens `http://<LAN_IP>:8099/mt5-agent-<v>.apk`.
 - Or over USB: `adb install -r releases/mt5-agent-<v>.apk`.
 
-The dashboard's Devices → Agent APK upload stores the APK that **Device Owner QR setup** installs
-(public download at `/api/agent/download/agent.apk`). Upload each new release there too.
+**Device Owner QR setup** installs the APK stored on the server (public download at
+`/api/agent/download/agent.apk`). There is no upload panel in the dashboard; set it from the server:
+`cd deploy && ./set-agent-apk.sh <apk> <versionCode> <versionName>` (LAN stack: prefix
+`COMPOSE_FILE=docker-compose.lan.yml ENV_FILE=.env.lan`). Do this for each new release.
 
 ### Backups and logs
 

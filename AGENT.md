@@ -82,22 +82,22 @@ adapts resolution/fps at the source via `adaptOutputFormat` so the virtual displ
   network returns. OkHttp `pingInterval(20s)` detects dead mobile links.
 - Wake locks: a **screen-bright** lock only while a session is open (`updateScreenWake`); a **lifetime
   CPU + Wi-Fi** keep-alive (`acquireKeepAlive`, added 0.5.1) to survive screen-off/Doze.
-- Updater: self-install via `PackageInstaller`. On `STATUS_PENDING_USER_ACTION` (not device owner) it
-  attempts the confirm activity AND posts a high-importance "tap to install" notification (0.5.1),
-  because Android 12+ suppresses background activity starts.
+- No self-updater (removed in 0.5.4): new versions are installed by hand over the old one.
 
 ## Device owner (the production setup)
 
 `DeviceOwner.applyPolicies()` when owner: postpone system updates, block uninstall, `setKeyguardDisabled(true)`,
 `STAY_ON_WHILE_PLUGGED_IN`, and grant runtime permissions silently. Set once on a **factory-reset,
-account-free** phone via `deploy/provision-phone.sh` (`adb shell dpm set-device-owner …`) or QR
-provisioning. This is what makes the fleet reliable: no lock screen, no process kills, no fallback,
-silent OTA.
+account-free** phone via `deploy/provision-phone.sh` (`adb shell dpm set-device-owner …`) or the
+dashboard's Device Owner setup QR (`Provisioning.kt` pairs with the code embedded in the QR). The QR
+installs the APK set on the server with `deploy/set-agent-apk.sh`. This is what makes the fleet
+reliable: no lock screen, no process kills, no fallback.
 
 ## Manifest highlights
 
 Permissions: INTERNET, FOREGROUND_SERVICE(+SPECIAL_USE/+MEDIA_PROJECTION), POST_NOTIFICATIONS,
-RECEIVE_BOOT_COMPLETED, REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, WAKE_LOCK, REQUEST_INSTALL_PACKAGES,
+RECEIVE_BOOT_COMPLETED, REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, WAKE_LOCK, ACCESS_NETWORK_STATE,
 READ_PHONE_STATE, CAMERA. Components: AgentService, InputService (accessibility, `canTakeScreenshot`),
 PairingActivity, QrScanActivity, CaptureConsentActivity, WakeActivity (showWhenLocked/turnScreenOn),
-AdminReceiver (device_admin), BootReceiver, InstallResultReceiver.
+AdminReceiver (device_admin), BootReceiver, ProvisioningModeActivity + PolicyComplianceActivity
+(Device Owner QR setup).

@@ -59,7 +59,8 @@ docker compose -f docker-compose.yml --env-file .env restart api
 **Recommended for dedicated phones: Device Owner QR.** The agent becomes the phone's owner, so
 Android cannot kill or uninstall it, the lock screen is off and permissions are granted for it.
 
-1. Dashboard → Devices → Agent APK: upload `releases/mt5-agent-<version>.apk` (once per version).
+1. On the server: `cd deploy && ./set-agent-apk.sh mt5-agent-<version>.apk <versionCode> <version>`
+   (once per version; copy the APK to the server first).
 2. Devices → **Device Owner setup QR**, optionally with the Wi-Fi name and password.
 3. Factory-reset the phone, don't add a Google account, tap the first welcome screen 6 times,
    scan the QR. The phone downloads the agent, makes it owner and pairs itself.
@@ -78,7 +79,7 @@ always encrypted by WebRTC.
 The agent does not update itself. Bump `versionCode` and `versionName` in
 `agent-android/app/build.gradle.kts`, run `agent-android/build-apk.sh`, and install the new
 `releases/mt5-agent-<version>.apk` on each phone over the old one (pairing and settings survive).
-Also upload it on the Devices page so new Device Owner setups get it. Every build is signed with
+Also run `deploy/set-agent-apk.sh` with it so new Device Owner setups get it. Every build is signed with
 the same key; Android refuses an update signed with a different one.
 
 ## Load test

@@ -277,9 +277,6 @@ main > table { display: block; overflow-x: auto; }
 }
 
 /* Misc -------------------------------------------------------------------- */
-.release { margin-bottom: 16px; }
-.release summary { cursor: pointer; font-weight: 550; }
-.release form { margin-top: 10px; }
 .settings { max-width: 760px; display: grid; gap: 12px; }
 .settings .steps ol { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 6px; }
 .notice-bar { margin-bottom: 16px; }

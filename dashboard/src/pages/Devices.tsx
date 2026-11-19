@@ -64,8 +64,6 @@ export default function Devices() {
         </div>
       )}
 
-      <AgentRelease />
-
       {error && <p className="error">{error}</p>}
       {devices && (
         <table>
@@ -207,69 +205,6 @@ function AccountsEditor({ deviceId }: { deviceId: string }) {
       </form>
       {error && <p className="error">{error}</p>}
     </div>
-  );
-}
-
-interface Release {
-  version_code?: number;
-  version_name?: string;
-  sha256?: string;
-  uploaded_at?: string;
-  uploaded_by?: string;
-}
-
-function AgentRelease() {
-  const [current, setCurrent] = useState<Release>({});
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    api<Release>("/api/agent/releases/current").then(setCurrent).catch(() => undefined);
-  }, []);
-
-  const upload = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!file) return;
-    setBusy(true);
-    setMsg(null);
-    const form = new FormData();
-    form.set("version_code", code);
-    form.set("version_name", name);
-    form.set("apk", file);
-    try {
-      const res = await fetch("/api/agent/releases", { method: "POST", body: form, credentials: "same-origin" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
-      setCurrent(data);
-      setMsg("Uploaded. Phones set up with the Device Owner QR from now on install this version.");
-    } catch (err: any) {
-      setMsg(err.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <details className="card release">
-      <summary>
-        Agent APK for Device Owner setup:{" "}
-        {current.version_name ? <strong>{current.version_name} (code {current.version_code})</strong> : <span className="muted">none uploaded</span>}
-      </summary>
-      <form className="row wrap" onSubmit={upload}>
-        <input type="number" min={1} placeholder="versionCode" value={code} onChange={(e) => setCode(e.target.value)} required />
-        <input placeholder="versionName, e.g. 0.2.0" value={name} onChange={(e) => setName(e.target.value)} required />
-        <input type="file" accept=".apk" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required />
-        <button type="submit" disabled={busy}>{busy ? "Uploading…" : "Upload"}</button>
-      </form>
-      <p className="muted small">
-        Upload <span className="mono">releases/mt5-agent-&lt;version&gt;.apk</span> with its versionCode. The Device Owner
-        setup QR installs this file on new phones. Phones already running are updated by installing the new APK by hand.
-      </p>
-      {msg && <p className="small">{msg}</p>}
-    </details>
   );
 }
 
