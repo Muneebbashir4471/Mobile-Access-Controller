@@ -28,8 +28,8 @@
 - **admin**: all phones (automatically), pairing, devices; creates and manages operators and other
   admins, including setting their passwords (Users page). Cannot touch superusers.
 - **operator**: only the phones assigned to them.
-- Everyone can change their own password and pick a theme + accent color under Settings (saved per
-  browser). Users have an optional display name; the Users page shows each user's last sign-in.
+- Passwords are set on the Users page (key icon), including your own; operators ask an admin.
+  Everyone picks a theme + accent color under Settings (saved per browser). Users have an optional display name; the Users page shows each user's last sign-in.
 
 Admins and superusers must use two-factor login (`REQUIRE_ADMIN_2FA`, on by default). If the only
 superuser loses their authenticator, set `REQUIRE_ADMIN_2FA=false` in `.env`, restart the api,

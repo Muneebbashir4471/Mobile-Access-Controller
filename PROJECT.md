@@ -57,7 +57,7 @@ All wired together with **Docker Compose** + Caddy (`deploy/`).
 
 - Server + dashboard: implemented and tested (`pytest` 14 passing; load test 30 phones/10 operators).
   Roles: superuser > admin > operator. Admins manage operators and other admins (not superusers)
-  and see every phone; anyone changes their own password in Settings (`POST /api/auth/password`).
+  and see every phone; passwords (incl. their own) are set on the Users page.
   Settings also has 22 app themes + accent colours (`dashboard/src/theme.ts`, per browser). Users
   carry an optional `name` and `last_login_at` (migration 0003).
 - Android agent: implemented (capture/input/device-owner QR setup/wake-unlock-lock/self-healing

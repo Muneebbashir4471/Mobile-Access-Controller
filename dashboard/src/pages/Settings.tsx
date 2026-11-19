@@ -11,7 +11,6 @@ export default function Settings() {
     <>
       <div className="toolbar"><h2>Settings</h2></div>
       <ThemeCard />
-      <PasswordCard />
       <section className="card settings">
         <h3>Two-factor login</h3>
         <p className="muted">
@@ -180,46 +179,6 @@ function ThemeCard() {
           {accent && <button type="button" className="ghost small" onClick={() => pickAccent(null)}>Reset</button>}
         </div>
       </div>
-    </section>
-  );
-}
-
-function PasswordCard() {
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [again, setAgain] = useState("");
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (next !== again) {
-      setMsg({ ok: false, text: "The new passwords do not match." });
-      return;
-    }
-    try {
-      await api("/api/auth/password", { method: "POST", body: { current_password: current, new_password: next } });
-      setCurrent("");
-      setNext("");
-      setAgain("");
-      setMsg({ ok: true, text: "Password changed." });
-    } catch (err: any) {
-      setMsg({ ok: false, text: err.message });
-    }
-  };
-
-  return (
-    <section className="card settings">
-      <h3>Change password</h3>
-      <form onSubmit={submit} className="row wrap">
-        <input type="password" placeholder="Current password" autoComplete="current-password" value={current}
-          onChange={(e) => setCurrent(e.target.value)} required />
-        <input type="password" placeholder="New password (12+)" autoComplete="new-password" minLength={12} value={next}
-          onChange={(e) => setNext(e.target.value)} required />
-        <input type="password" placeholder="New password again" autoComplete="new-password" minLength={12} value={again}
-          onChange={(e) => setAgain(e.target.value)} required />
-        <button type="submit">Change password</button>
-      </form>
-      {msg && <p className={msg.ok ? "ok-text small" : "error"}>{msg.text}</p>}
     </section>
   );
 }

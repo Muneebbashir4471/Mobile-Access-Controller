@@ -274,16 +274,6 @@ def test_fallback_alert_after_grace_period(client, monkeypatch):
         assert alert["kind"] == "fallback" and "1 fps" in alert["message"]
 
 
-def test_change_own_password(client):
-    _admin(client)
-    bad = client.post("/api/auth/password", json={"current_password": "wrong", "new_password": "x" * 12})
-    assert bad.status_code == 400
-    ok = client.post("/api/auth/password", json={"current_password": PASSWORD, "new_password": "brand-new-password"})
-    assert ok.status_code == 200
-    short = client.post("/api/auth/password", json={"current_password": "brand-new-password", "new_password": "short"})
-    assert short.status_code == 422
-
-
 def test_user_name_and_last_sign_in(client):
     _admin(client)
     me = next(u for u in client.get("/api/users").json() if u["email"] == "admin@example.com")
