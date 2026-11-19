@@ -305,7 +305,6 @@ def test_superuser_is_anonymous_on_shared_screens(client):
         with su.websocket_connect("/ws/operator") as sws:
             sws.send_json({"type": "open", "device_id": dev_token["device_id"]})
             _recv_until(sws, "opened")
-            with client.websocket_connect("/ws/operator") as aws:  # the admin
-                aws.send_json({"type": "open", "device_id": dev_token["device_id"]})
-                denied = _recv_until(aws, "denied")
-                assert denied["held_by"] == "Administrator"
+            # The admin's phone list shows who holds it, without revealing the superuser.
+            phone = next(d for d in client.get("/api/devices").json() if d["id"] == dev_token["device_id"])
+            assert "owner@example.com" not in str(phone) and "Administrator" in str(phone)
